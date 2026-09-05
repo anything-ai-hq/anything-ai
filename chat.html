@@ -53,6 +53,16 @@
   #loginPanel h3 { margin-top: 0; }
   #loginName { width: 100%; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin: 12px 0; text-align: center; }
 
+  #ollamaOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; z-index: 20; }
+  #ollamaOverlay.open { display: flex; }
+  #ollamaPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 28px; width: 400px; text-align: center; }
+  #ollamaPanel h3 { margin-top: 0; }
+  #ollamaPanel p { color: #aaa; font-size: 14px; line-height: 1.5; }
+  #ollamaPanel code { background: #2a2a2a; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  .ollama-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  #installOllama { background: #2d5a9e; display: block; text-decoration: none; padding: 10px 18px; border-radius: 6px; color: white; }
+  #retryOllama, #continueAnyway { background: #444; }
+
   #agentsOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
   #agentsOverlay.open { display: flex; }
   #agentsPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 380px; max-height: 80vh; overflow-y: auto; }
@@ -132,6 +142,14 @@
       <button id="addAgent">Add agent</button>
       <button id="closeAgents">Close</button>
     </div>
+  </div>
+</div>
+
+<div id="ollamaOverlay">
+  <div id="ollamaPanel">
+    <h3 id="ollamaTitle">Checking for Ollama...</h3>
+    <p id="ollamaMessage">Looking for a local Ollama running on this device.</p>
+    <div class="ollama-actions" id="ollamaActions"></div>
   </div>
 </div>
 
@@ -603,6 +621,52 @@ for (const [key, id] of [["enthusiasm", "setEnthusiasm"], ["emojis", "setEmojis"
     saveSettings(settings);
   });
 }
+
+// Ollama detection: a fetch to localhost:11434 fails identically whether
+// Ollama isn't installed OR it's installed but its CORS allowlist doesn't
+// include this page's origin (Ollama only allows localhost origins by
+// default) — a browser can't tell those apart, so the message covers both.
+const OLLAMA_URL = "http://localhost:11434/api/tags";
+
+async function checkOllama() {
+  const overlay = document.getElementById("ollamaOverlay");
+  const title = document.getElementById("ollamaTitle");
+  const message = document.getElementById("ollamaMessage");
+  const actions = document.getElementById("ollamaActions");
+  overlay.classList.add("open");
+  title.textContent = "Checking for Ollama...";
+  message.textContent = "Looking for a local Ollama running on this device.";
+  actions.innerHTML = "";
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    await fetch(OLLAMA_URL, { signal: controller.signal });
+    clearTimeout(timeout);
+    overlay.classList.remove("open");
+  } catch {
+    title.textContent = "Can't reach Ollama";
+    message.innerHTML = `Either it's not installed on this device, or it's installed but blocking this site (Ollama only allows <code>localhost</code> origins by default).<br><br>If it's already installed, set <code>OLLAMA_ORIGINS=${location.origin}</code> before starting <code>ollama serve</code>, then retry.`;
+    const install = document.createElement("a");
+    install.id = "installOllama";
+    install.href = "https://ollama.com/download";
+    install.target = "_blank";
+    install.rel = "noopener";
+    install.textContent = "You don't have Ollama. Install here";
+    const retry = document.createElement("button");
+    retry.id = "retryOllama";
+    retry.textContent = "Retry";
+    retry.addEventListener("click", checkOllama);
+    const skip = document.createElement("button");
+    skip.id = "continueAnyway";
+    skip.textContent = "Continue anyway";
+    skip.addEventListener("click", () => overlay.classList.remove("open"));
+    actions.appendChild(install);
+    actions.appendChild(retry);
+    actions.appendChild(skip);
+  }
+}
+checkOllama();
 
 document.getElementById("loginSubmit").addEventListener("click", submitLogin);
 document.getElementById("loginName").addEventListener("keydown", (e) => { if (e.key === "Enter") submitLogin(); });
