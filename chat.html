@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Soi &amp; Koda</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { font-family: system-ui, sans-serif; margin: 0; background: #1e1e1e; color: #ddd; display: flex; height: 100vh; }
@@ -52,6 +53,7 @@
   #loginPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 320px; text-align: center; }
   #loginPanel h3 { margin-top: 0; }
   #loginName { width: 100%; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin: 12px 0; text-align: center; }
+  #loginMessage { font-size: 13px; color: #888; margin-top: 8px; min-height: 1em; }
 
   #ollamaOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; z-index: 20; }
   #ollamaOverlay.open { display: flex; }
@@ -155,9 +157,10 @@
 
 <div id="loginOverlay" class="hidden">
   <div id="loginPanel">
-    <h3>Who's coding?</h3>
-    <input id="loginName" placeholder="Your name" autofocus>
-    <button id="loginSubmit">Continue</button>
+    <h3>Sign in</h3>
+    <input id="loginName" type="email" placeholder="you@example.com" autofocus>
+    <button id="loginSubmit">Send magic link</button>
+    <div id="loginMessage"></div>
   </div>
 </div>
 
@@ -207,40 +210,54 @@ const PERSONA = {
 
 const DEFAULT_SETTINGS = { enthusiasm: "low", emojis: "low", sarcasm: "low" };
 
-function loadSettings() {
-  try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem("luau_settings")) }; }
-  catch { return { ...DEFAULT_SETTINGS }; }
+// Real accounts via Supabase (free tier): email magic-link auth, and every
+// chat/agent/memory-fact/setting lives in Postgres behind row-level security
+// (see supabase_schema.sql) instead of localStorage — so it follows you
+// across devices. The anon/publishable key below is meant for client-side use.
+const SUPABASE_URL = "https://uanxpfczolevgvqinvfr.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_RE8YzohDnvgtj83qmQ7Iew_4y4ZFL4o";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let settings = { ...DEFAULT_SETTINGS };
+let chats = [];
+let activeChatId = null;
+
+function rowToChat(row) {
+  return { id: row.id, title: row.title, messages: row.messages || [], model: row.model, effort: row.effort, agentId: row.agent_id };
 }
-function saveSettings(s) { localStorage.setItem("luau_settings", JSON.stringify(s)); }
 
-function loadChats() {
-  try { return JSON.parse(localStorage.getItem("luau_chats")) || []; }
-  catch { return []; }
+async function saveSettings(s) {
+  settings = s;
+  await db.from("settings").upsert({ user_id: currentUser.id, ...s });
 }
-function saveChats(chats) { localStorage.setItem("luau_chats", JSON.stringify(chats)); }
 
-let settings = loadSettings();
-let chats = loadChats();
-let activeChatId = localStorage.getItem("luau_active_chat_id");
+async function loadAllData() {
+  const [chatsRes, agentsRes, memoryRes, settingsRes] = await Promise.all([
+    db.from("chats").select("*").order("created_at", { ascending: false }),
+    db.from("agents").select("*").order("created_at", { ascending: true }),
+    db.from("memory").select("*").order("created_at", { ascending: true }),
+    db.from("settings").select("*").eq("user_id", currentUser.id).maybeSingle(),
+  ]);
+  chats = (chatsRes.data || []).map(rowToChat);
+  agents = (agentsRes.data || []).map((r) => ({ id: r.id, name: r.name, prompt: r.prompt }));
+  memory = (memoryRes.data || []).map((r) => ({ id: r.id, fact: r.fact }));
+  settings = settingsRes.data ? { enthusiasm: settingsRes.data.enthusiasm, emojis: settingsRes.data.emojis, sarcasm: settingsRes.data.sarcasm } : { ...DEFAULT_SETTINGS };
+}
 
-// No backend here (static page hitting Ollama directly), so there's nothing to
-// authenticate against. This is a name tag + localStorage, not real auth.
-function loadUsername() { return localStorage.getItem("luau_username"); }
-function saveUsername(name) { localStorage.setItem("luau_username", name); }
+function memoryFacts() {
+  return memory.map((m) => m.fact);
+}
 
 function renderGreeting() {
-  const name = loadUsername();
-  document.getElementById("prompt").placeholder = name ? `What's up, ${name}` : "Ask for some Luau code...";
+  document.getElementById("prompt").placeholder = currentUser ? `What's up, ${currentUser.email}` : "Ask for some Luau code...";
   const el = document.getElementById("greeting");
   el.innerHTML = "";
-  if (!name) return;
+  if (!currentUser) return;
   const logout = document.createElement("span");
   logout.className = "logout";
   logout.textContent = "Log out";
-  logout.addEventListener("click", () => {
-    localStorage.removeItem("luau_username");
-    showLogin();
-  });
+  logout.addEventListener("click", () => db.auth.signOut());
   el.appendChild(logout);
 }
 
@@ -249,46 +266,42 @@ function showLogin() {
   document.getElementById("loginName").focus();
 }
 
-function submitLogin() {
+async function submitLogin() {
   const input = document.getElementById("loginName");
-  const name = input.value.trim();
-  if (!name) return;
-  saveUsername(name);
-  input.value = "";
-  document.getElementById("loginOverlay").classList.add("hidden");
-  renderGreeting();
-  renderLog();
+  const msg = document.getElementById("loginMessage");
+  const email = input.value.trim();
+  if (!email) return;
+  msg.textContent = "Sending...";
+  const { error } = await db.auth.signInWithOtp({ email, options: { emailRedirectTo: location.href.split("#")[0] } });
+  msg.textContent = error ? `Error: ${error.message}` : "Check your email for a magic link.";
 }
 
 // Cross-chat memory: a flat list of short facts, shared across all chats via
-// localStorage, injected into every request's system prompt. Extraction uses
-// the same small model, so quality is rough — good enough for a prototype.
+// Supabase, injected into every request's system prompt. Extraction uses the
+// same small model, so quality is rough — good enough for a prototype.
 const MAX_MEMORY_FACTS = 40;
 
-function loadMemory() {
-  try { return JSON.parse(localStorage.getItem("luau_memory")) || []; }
-  catch { return []; }
-}
-function saveMemory(facts) { localStorage.setItem("luau_memory", JSON.stringify(facts)); }
+let memory = []; // [{id, fact}], populated by loadAllData()
 
-let memory = loadMemory();
-
-function addMemoryFact(fact) {
+async function addMemoryFact(fact) {
   fact = fact.trim();
   if (!fact) return false;
-  if (memory.some((f) => f.toLowerCase() === fact.toLowerCase())) return false;
-  memory.push(fact);
-  if (memory.length > MAX_MEMORY_FACTS) memory.shift();
-  saveMemory(memory);
+  if (memory.some((m) => m.fact.toLowerCase() === fact.toLowerCase())) return false;
+  const { data, error } = await db.from("memory").insert({ fact }).select().single();
+  if (error) return false;
+  memory.push({ id: data.id, fact: data.fact });
+  if (memory.length > MAX_MEMORY_FACTS) {
+    const oldest = memory.shift();
+    await db.from("memory").delete().eq("id", oldest.id);
+  }
   return true;
 }
 
-function forgetMemory(keyword) {
-  const before = memory.length;
-  if (keyword.toLowerCase() === "all") memory = [];
-  else memory = memory.filter((f) => !f.toLowerCase().includes(keyword.toLowerCase()));
-  saveMemory(memory);
-  return before - memory.length;
+async function forgetMemory(keyword) {
+  const toDelete = keyword.toLowerCase() === "all" ? memory : memory.filter((m) => m.fact.toLowerCase().includes(keyword.toLowerCase()));
+  if (toDelete.length) await db.from("memory").delete().in("id", toDelete.map((m) => m.id));
+  memory = memory.filter((m) => !toDelete.includes(m));
+  return toDelete.length;
 }
 
 async function maybeExtractMemory(modelName, userText, assistantText) {
@@ -305,20 +318,14 @@ async function maybeExtractMemory(modelName, userText, assistantText) {
     });
     const data = await res.json();
     const fact = (data.message?.content || "").trim();
-    if (fact && fact.toUpperCase() !== "NONE" && fact.length < 200) addMemoryFact(fact);
+    if (fact && fact.toUpperCase() !== "NONE" && fact.length < 200) await addMemoryFact(fact);
   } catch { /* best-effort, ignore failures */ }
 }
 
 // Agent Mode: saved personas (name + free-text system prompt), nothing more.
 // No filesystem or command execution access — an "agent" here is just a
 // system-prompt preset a chat can be pinned to.
-function loadAgents() {
-  try { return JSON.parse(localStorage.getItem("luau_agents")) || []; }
-  catch { return []; }
-}
-function saveAgents(a) { localStorage.setItem("luau_agents", JSON.stringify(a)); }
-
-let agents = loadAgents();
+let agents = []; // populated by loadAllData()
 let currentAgentId = localStorage.getItem("luau_current_agent_id") || "";
 let currentModelId = localStorage.getItem("luau_current_model_id") || DEFAULT_MODEL_ID;
 let currentEffortId = localStorage.getItem("luau_current_effort_id") || DEFAULT_EFFORT_ID;
@@ -383,9 +390,9 @@ function renderAgentList() {
     const del = document.createElement("span");
     del.className = "del";
     del.textContent = "✕";
-    del.addEventListener("click", () => {
+    del.addEventListener("click", async () => {
+      await db.from("agents").delete().eq("id", agent.id);
       agents = agents.filter((a) => a.id !== agent.id);
-      saveAgents(agents);
       if (currentAgentId === agent.id) { currentAgentId = ""; localStorage.setItem("luau_current_agent_id", ""); }
       renderAgentList();
       renderAgentSelect();
@@ -410,15 +417,18 @@ function buildSystemPrompt(chat) {
   if (agent) parts.push("Persona for this chat: " + agent.prompt);
   const effortNudge = getEffort(chat).nudge;
   if (effortNudge) parts.push(effortNudge);
-  if (memory.length) parts.push("Known context about the user/project from past chats: " + memory.join("; "));
+  if (memory.length) parts.push("Known context about the user/project from past chats: " + memoryFacts().join("; "));
   return parts.join(" ");
 }
 
-function newChat() {
-  const chat = { id: crypto.randomUUID(), title: "New chat", messages: [], agentId: currentAgentId || null, model: currentModelId, effort: currentEffortId };
+async function newChat() {
+  const { data, error } = await db.from("chats").insert({
+    title: "New chat", messages: [], model: currentModelId, effort: currentEffortId, agent_id: currentAgentId || null,
+  }).select().single();
+  if (error) return;
+  const chat = rowToChat(data);
   chats.unshift(chat);
   activeChatId = chat.id;
-  persist();
   render();
 }
 
@@ -426,9 +436,13 @@ function getActiveChat() {
   return chats.find((c) => c.id === activeChatId) || null;
 }
 
-function persist() {
-  saveChats(chats);
-  if (activeChatId) localStorage.setItem("luau_active_chat_id", activeChatId);
+// Chat mutations write straight to Supabase (the in-memory `chats` array is
+// just a render cache) instead of one big localStorage blob write.
+async function persistChat(chat) {
+  await db.from("chats").update({
+    title: chat.title, messages: chat.messages, model: chat.model, effort: chat.effort, agent_id: chat.agentId,
+    updated_at: new Date().toISOString(),
+  }).eq("id", chat.id);
 }
 
 function renderChatList() {
@@ -444,16 +458,16 @@ function renderChatList() {
     const del = document.createElement("span");
     del.className = "del";
     del.textContent = "✕";
-    del.addEventListener("click", (e) => {
+    del.addEventListener("click", async (e) => {
       e.stopPropagation();
+      await db.from("chats").delete().eq("id", chat.id);
       chats = chats.filter((c) => c.id !== chat.id);
       if (activeChatId === chat.id) activeChatId = chats[0]?.id || null;
-      persist();
       render();
     });
     item.appendChild(title);
     item.appendChild(del);
-    item.addEventListener("click", () => { activeChatId = chat.id; persist(); render(); });
+    item.addEventListener("click", () => { activeChatId = chat.id; render(); });
     list.appendChild(item);
   }
 }
@@ -464,10 +478,9 @@ function renderLog() {
   const chat = getActiveChat();
   if (!chat) return;
   if (chat.messages.length === 0) {
-    const name = loadUsername();
     const greet = document.createElement("div");
     greet.id = "emptyGreeting";
-    greet.textContent = name ? `What's up, ${name}` : "What's up";
+    greet.textContent = currentUser ? `What's up, ${currentUser.email}` : "What's up";
     log.appendChild(greet);
     return;
   }
@@ -491,20 +504,20 @@ const LOCAL_COMMANDS = {
   },
   memory: {
     desc: "/memory - show what's remembered across chats",
-    run: () => (memory.length ? memory.map((f) => "- " + f).join("\n") : "Nothing remembered yet."),
+    run: () => (memory.length ? memoryFacts().map((f) => "- " + f).join("\n") : "Nothing remembered yet."),
   },
   remember: {
     desc: "/remember <fact> - save a fact across all chats",
-    run: (args) => {
+    run: async (args) => {
       if (!args) return "Usage: /remember <fact>";
-      return addMemoryFact(args) ? `Remembered: ${args}` : "Already remembered.";
+      return (await addMemoryFact(args)) ? `Remembered: ${args}` : "Already remembered.";
     },
   },
   forget: {
     desc: "/forget <keyword|all> - remove remembered fact(s)",
-    run: (args) => {
+    run: async (args) => {
       if (!args) return "Usage: /forget <keyword|all>";
-      const n = forgetMemory(args);
+      const n = await forgetMemory(args);
       return n > 0 ? `Forgot ${n} fact(s).` : "No matching facts.";
     },
   },
@@ -535,7 +548,7 @@ async function send() {
   if (!raw) return;
 
   let chat = getActiveChat();
-  if (!chat) { newChat(); chat = getActiveChat(); }
+  if (!chat) { await newChat(); chat = getActiveChat(); }
 
   let text = raw;
   if (raw.startsWith("/")) {
@@ -544,8 +557,8 @@ async function send() {
     const args = spaceIdx === -1 ? "" : raw.slice(spaceIdx + 1).trim();
     if (LOCAL_COMMANDS[cmd]) {
       promptBox.value = "";
-      chat.messages.push({ role: "info", content: LOCAL_COMMANDS[cmd].run(args) });
-      persist();
+      chat.messages.push({ role: "info", content: await LOCAL_COMMANDS[cmd].run(args) });
+      await persistChat(chat);
       render();
       return;
     }
@@ -554,7 +567,7 @@ async function send() {
     } else {
       promptBox.value = "";
       chat.messages.push({ role: "info", content: `Unknown command: /${cmd}. Try /help.` });
-      persist();
+      await persistChat(chat);
       render();
       return;
     }
@@ -564,7 +577,7 @@ async function send() {
   sendBtn.disabled = true;
   chat.messages.push({ role: "user", content: text });
   if (chat.title === "New chat") chat.title = raw.slice(0, 40);
-  persist();
+  await persistChat(chat);
   render();
   const assistantDiv = addBubble("assistant", "");
 
@@ -593,7 +606,7 @@ async function send() {
       }
     }
     chat.messages.push({ role: "assistant", content: full });
-    persist();
+    await persistChat(chat);
     maybeExtractMemory(getModel(chat).ollama, text, full);
   } catch (e) {
     assistantDiv.textContent = "Error: " + e.message + "\n(Is `ollama serve` running?)";
@@ -675,13 +688,13 @@ document.getElementById("modelSelect").addEventListener("change", (e) => {
   currentModelId = e.target.value;
   localStorage.setItem("luau_current_model_id", currentModelId);
   const chat = getActiveChat();
-  if (chat) { chat.model = currentModelId; persist(); }
+  if (chat) { chat.model = currentModelId; persistChat(chat); }
 });
 document.getElementById("effortSelect").addEventListener("change", (e) => {
   currentEffortId = e.target.value;
   localStorage.setItem("luau_current_effort_id", currentEffortId);
   const chat = getActiveChat();
-  if (chat) { chat.effort = currentEffortId; persist(); }
+  if (chat) { chat.effort = currentEffortId; persistChat(chat); }
 });
 document.getElementById("agentSelect").addEventListener("change", (e) => {
   currentAgentId = e.target.value;
@@ -693,28 +706,44 @@ document.getElementById("agentsBtn").addEventListener("click", () => {
   agentsOverlay.classList.add("open");
 });
 document.getElementById("closeAgents").addEventListener("click", () => agentsOverlay.classList.remove("open"));
-document.getElementById("addAgent").addEventListener("click", () => {
+document.getElementById("addAgent").addEventListener("click", async () => {
   const nameInput = document.getElementById("newAgentName");
   const promptInput = document.getElementById("newAgentPrompt");
   const name = nameInput.value.trim();
   const prompt = promptInput.value.trim();
   if (!name || !prompt) return;
-  agents.push({ id: crypto.randomUUID(), name, prompt });
-  saveAgents(agents);
+  const { data, error } = await db.from("agents").insert({ name, prompt }).select().single();
+  if (error) return;
+  agents.push({ id: data.id, name: data.name, prompt: data.prompt });
   nameInput.value = "";
   promptInput.value = "";
   renderAgentList();
   renderAgentSelect();
 });
 
-if (!activeChatId || !getActiveChat()) {
-  if (chats.length) activeChatId = chats[0].id;
-  else newChat();
-}
-render();
-renderGreeting();
-renderAgentSelect();
-if (!loadUsername()) showLogin();
+db.auth.onAuthStateChange(async (event, session) => {
+  if (session) {
+    currentUser = session.user;
+    document.getElementById("loginOverlay").classList.add("hidden");
+    await loadAllData();
+    if (!activeChatId || !getActiveChat()) {
+      if (chats.length) activeChatId = chats[0].id;
+      else await newChat();
+    }
+    render();
+    renderGreeting();
+    renderAgentSelect();
+  } else {
+    currentUser = null;
+    chats = [];
+    agents = [];
+    memory = [];
+    settings = { ...DEFAULT_SETTINGS };
+    activeChatId = null;
+    render();
+    showLogin();
+  }
+});
 </script>
 </body>
 </html>

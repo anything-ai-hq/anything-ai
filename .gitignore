@@ -1,4 +1,5 @@
 .venv/
+.netlify/
 outputs/
 models/
 models_gguf/*
