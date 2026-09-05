@@ -58,6 +58,14 @@
   #loginPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 320px; text-align: center; }
   #loginPanel h3 { margin-top: 0; }
   #loginName { width: 100%; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin: 12px 0; text-align: center; }
+  /* Browser autofill (esp. Chrome) forces its own white bg + text color otherwise,
+     making typed/autofilled text invisible on our dark inputs. */
+  input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ddd;
+    -webkit-box-shadow: 0 0 0px 1000px #2a2a2a inset;
+    box-shadow: 0 0 0px 1000px #2a2a2a inset;
+    caret-color: #ddd;
+  }
   #loginMessage { font-size: 13px; color: #888; margin-top: 8px; min-height: 1em; }
 
   #ollamaOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; z-index: 20; }
@@ -333,8 +341,10 @@ async function maybeExtractMemory(modelName, userText, assistantText) {
       body: JSON.stringify({
         model: modelName,
         stream: false,
-        system: "Extract at most one short durable fact about the user or their project (preferences, project name, tech choices) from this exchange, worth remembering in future unrelated conversations. Reply with just the fact in a few words, nothing else. If there's nothing durable, reply with exactly: NONE",
-        messages: [{ role: "user", content: `User: ${userText}\nAssistant: ${assistantText}` }],
+        messages: [
+          { role: "system", content: "Extract at most one short durable fact about the user or their project (preferences, project name, tech choices) from this exchange, worth remembering in future unrelated conversations. Reply with just the fact in a few words, nothing else. If there's nothing durable, reply with exactly: NONE" },
+          { role: "user", content: `User: ${userText}\nAssistant: ${assistantText}` },
+        ],
       }),
     });
     const data = await res.json();
@@ -615,7 +625,12 @@ async function send() {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: getModel(chat).ollama, messages: apiMessages(chat), system: buildSystemPrompt(chat), options: getEffort(chat).options, stream: true }),
+      body: JSON.stringify({
+        model: getModel(chat).ollama,
+        messages: [{ role: "system", content: buildSystemPrompt(chat) }, ...apiMessages(chat)],
+        options: getEffort(chat).options,
+        stream: true,
+      }),
     });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
