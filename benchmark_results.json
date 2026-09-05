@@ -1,0 +1,200 @@
+{
+  "qwen2.5-coder:1.5b-instruct": {
+    "summary": {
+      "model": "qwen2.5-coder:1.5b-instruct",
+      "syntax_ok_rate": 0.6,
+      "avg_keyword_hit_rate": 0.9333333333333333
+    },
+    "records": [
+      {
+        "prompt": "Write a Luau function that returns the sum of a table of numbers.",
+        "response": "Certainly! Below is a Lua function that takes a table of numbers as input and returns their sum:\n\n```lua\nfunction sumTable(table)\n    local sum = 0\n    for _, value in ipairs(table) do\n        sum = sum + value\n    end\n    return sum\nend\n\n-- Example usage:\nlocal numbers = {1, 2, 3, 4, 5}\nlocal result = sumTable(numbers)\nprint(result)  -- Output: 15\n```\n\n### Explanation:\n1. **Function Definition**: The function `sumTable` takes a single parameter `table`, which is expected to be a table of numbers.\n2. **Initialization**: A local variable `sum` is initialized to 0. This variable will store the sum of the numbers in the table.\n3. **Loop Through Table**: The `ipairs` function is used to iterate over each element in the table. The first element is assigned to `_, value` in the loop, where `value` is the current number in the table.\n4. **Sum Calculation**: Inside the loop, `sum` is updated by adding the current `value` to itself.\n5. **Return Result**: After the loop completes, the function returns the final value of `sum`.\n\nThis function is straightforward and efficient for summing up the elements of a table of numbers.",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau script that fires a RemoteEvent named 'Damage' from a LocalScript to the server, passing an amount parameter.",
+        "response": "To create a Luau script that fires a `RemoteEvent` named 'Damage' from a `LocalScript` to the server, you can use the following code:\n\n```lua\n-- Create a new LocalScript object\nlocal localScript = Instance.new(\"LocalScript\")\n\n-- Set the name of the LocalScript\nlocalScript.Name = \"FireDamage\"\n\n-- Set the parent of the LocalScript to a parent object, such as a workspace or a script folder\nlocalScript.Parent = workspace\n\n-- Create a function to handle the damage being received\nfunction handleDamage(amount)\n    print(\"Received damage: \" .. amount)\n    -- Add your logic here to handle the damage\nend\n\n-- Create a RemoteEvent named 'Damage'\nlocal remoteEvent = Instance.new(\"RemoteEvent\")\nremoteEvent.Name = \"Damage\"\n\n-- Connect the handleDamage function to the RemoteEvent's OnServerEvent event\nremoteEvent.OnServerEvent:Connect(handleDamage)\n\n-- Function to simulate damage being received from the server\nfunction simulateDamage(amount)\n    -- Fire the 'Damage' RemoteEvent to the server with the provided amount\n    remoteEvent:FireServer(amount)\nend\n\n-- Example usage:\nsimulateDamage(10) -- This will trigger the handleDamage function with the amount 10\n```\n\nThis script sets up a `LocalScript` that listens for the `Damage` RemoteEvent from the server. When the event is fired, the `handleDamage` function is called with the amount parameter. The `simulateDamage` function is an example of how to fire the `Damage` RemoteEvent from the server with a specific amount of damage.",
+        "syntax_ok": false,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau ModuleScript that implements a simple class with a constructor and a method, using metatables.",
+        "response": "Certainly! Below is a simple Lua script that implements a class using metatables. This script defines a class called `Person` with a constructor and a method to display a message.\n\n```lua\n-- Define the Person class using a metatable\nlocal Person = {}\n\n-- Create a metatable for the Person class\nlocal PersonMeta = {}\n\n-- Set the __index metamethod for the metatable\nPersonMeta.__index = function(self, key)\n    if key == \"name\" then\n        return self.name\n    elseif key == \"greet\" then\n        return function(self)\n            return \"Hello, my name is \" .. self.name .. \".\"\n        end\n    else\n        error(\"Invalid method or property: \" .. key)\n    end\nend\n\n-- Set the Person constructor function\nfunction Person.new(name)\n    local person = {}\n    setmetatable(person, PersonMeta)\n    person.name = name\n    return person\nend\n\n-- Create an instance of the Person class\nlocal john = Person.new(\"John Doe\")\n\n-- Use the greet method on the instance\nprint(john:greet())\n```\n\n### Explanation:\n1. **Class Definition**:\n   - `Person` is a table that represents the class.\n   - `PersonMeta` is a table that represents the metatable for the `Person` class.\n\n2. **Metatable Setups**:\n   - `PersonMeta.__index` is set to a function that returns the value associated with a key in the `Person` table. This allows the metatable to provide default behavior for accessing properties and methods that do not exist.\n   - The `Person` table itself is used as the metatable for instances of `Person`, so any attempts to access non-existent keys will be handled by the metatable.\n\n3. **Constructor Function**:\n   - `Person.new(name)` is a constructor function that creates a new instance of the `Person` class.\n   - It sets the `name` property of the new instance and returns it.\n\n4. **Instance Usage**:\n   - `john = Person.new(\"John Doe\")` creates a new instance of the `Person` class with the name \"John Doe\".\n   - `john:greet()` calls the `greet` method on the `john` instance, which returns a greeting message.\n\nThis script demonstrates how to use metatables to define a class with methods and properties, allowing for flexible and powerful object-oriented programming in Lua.",
+        "syntax_ok": false,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that debounces rapid calls, only allowing one call per second.",
+        "response": "Certainly! To create a Luau function that debounces rapid calls and allows only one call per second, you can use a simple timer to track the last call time. Here's an example implementation:\n\n```lua\nlocal Debouncer = {}\n\nfunction Debouncer:new(callback, delay)\n    local lastCallTime = 0\n    local timer = nil\n\n    local function runDebounced()\n        timer = nil\n        callback()\n    end\n\n    return function(self)\n        local currentTime = os.time()\n        if currentTime - lastCallTime >= delay then\n            lastCallTime = currentTime\n            runDebounced()\n        else\n            -- Cancel the current timer if it's still running\n            if timer then\n                timer:cancel()\n            end\n            -- Set up a new timer to fire after the delay\n            timer = coroutine.create(function()\n                coroutine.yield()\n                runDebounced()\n            end)\n            coroutine.resume(timer)\n        end\n    end\nend\n\n-- Example usage:\nlocal debouncedFunction = Debouncer:new(function()\n    print(\"Debounced function called\")\nend, 1) -- Debounce for 1 second\n\n-- Example of calling the debounced function:\ndebouncedFunction()  -- This will be debounced and only called once per second\ndebouncedFunction()  -- This will be debounced and only called once per second\ndebouncedFunction()  -- This will be debounced and only called once per second\n```\n\n### Explanation:\n1. **Debouncer Table**: A table is created to hold the debouncing logic.\n2. **new Method**: The `new` method takes a callback function and a delay time as parameters.\n3. **lastCallTime**: This variable keeps track of the last time the callback was called.\n4. **timer**: This variable holds the timer that will be used to debounce the callback.\n5. **runDebounced Function**: This function is called when it's time to execute the callback.\n6. **Debounce Function**: This function checks if it's time to execute the callback:\n   - If the current time minus the last call time is greater than or equal to the delay, it calls the callback and resets `lastCallTime`.\n   - If the last call time is within the delay, it cancels the current timer and sets up a new timer to fire after the delay.\n\nThis implementation ensures that the callback is only executed once per second, even if the function is called multiple times very quickly.",
+        "syntax_ok": false,
+        "keyword_hit_rate": 0.0
+      },
+      {
+        "prompt": "Write Luau server script code that listens for a RemoteEvent 'Damage' via OnServerEvent and applies damage to a humanoid.",
+        "response": "Certainly! Below is a simple Lua script that listens for the `Damage` RemoteEvent on the server. When the event is triggered, it calculates the damage dealt to a humanoid and applies it to the player's health.\n\n```lua\n-- Assuming you have a humanoid in your game\nlocal humanoid = game.Players.LocalPlayer.Character\n\n-- Function to handle the Damage event\nlocal function onDamage(event)\n    if humanoid then\n        -- Extract the damage value from the event\n        local damage = event.Argument1\n\n        -- Apply damage to the humanoid\n        humanoid.Health = humanoid.Health - damage\n    else\n        print(\"No player is in the game.\")\n    end\nend\n\n-- Connect the OnServerEvent to the onDamage function\ngame.ReplicatedStorage.Damage.OnServerEvent:Connect(onDamage)\n```\n\n### Explanation:\n\n1. **LocalPlayer.Character**: This retrieves the local player's humanoid object. You can use `game.Players.LocalPlayer.CharacterAdded:Connect(onCharacterAdded)` if you want to ensure the humanoid is ready before handling the damage.\n\n2. **onDamage Function**: This function takes the `Damage` event as an argument and checks if the humanoid exists. If it does, it extracts the damage value from the event and applies it to the humanoid's health. If no player is found, it prints a message to the console.\n\n3. **game.ReplicatedStorage.Damage.OnServerEvent:Connect(onDamage)**: This connects the `Damage` event to the `onDamage` function. When the event is triggered, the `onDamage` function is called with the event object as the argument.\n\n### Important Notes:\n- Ensure that the `Damage` RemoteEvent is created in the `ReplicatedStorage` folder of your game.\n- The `Argument1` of the `Damage` event is assumed to be the damage value. You may need to adjust this if the event uses a different argument format.\n- This script assumes that the `Health` property of the humanoid is a numeric value that you can subtract from to deal damage. Adjust the logic if needed based on your game's physics or game mechanics.",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that performs a raycast from a part's position downward to check for ground.",
+        "response": "Certainly! Below is a Lua script that defines a function `RaycastDownward` that performs a raycast from a part's position downward to check for ground. This function will return the first part it hits that has a `Terrain` or `SurfaceMeshPart` component, or `nil` if no ground is found.\n\n```lua\nfunction RaycastDownward(part)\n    -- Get the position of the part\n    local partPosition = part.Position\n    \n    -- Define the direction for the raycast (downward)\n    local direction = Vector3.New(0, -1, 0)\n    \n    -- Perform the raycast\n    local hit = workspace:Raycast(partPosition, direction, true)\n    \n    if hit then\n        -- Check if the hit part has a Terrain or SurfaceMeshPart component\n        if hit.Part and hit.Part:FindFirstChildOfClass(\"Terrain\") or hit.Part:FindFirstChildOfClass(\"SurfaceMeshPart\") then\n            return hit.Part\n        end\n    end\n    \n    return nil\nend\n```\n\n### Explanation:\n1. **Get the Position of the Part**: We use `part.Position` to get the position of the part from which the raycast will originate.\n2. **Define the Direction**: We define the direction of the raycast as downward using `Vector3.New(0, -1, 0)`.\n3. **Perform the Raycast**: We use `workspace:Raycast` to perform the raycast from the part's position in the specified direction. The `true` parameter indicates that we want to collide with solid objects.\n4. **Check the Hit**: If a hit occurs, we check if the hit part has a `Terrain` or `SurfaceMeshPart` component using `hit.Part:FindFirstChildOfClass(\"Terrain\")` and `hit.Part:FindFirstChildOfClass(\"SurfaceMeshPart\")` respectively. If either component is found, we return the hit part.\n5. **Return `nil`**: If no hit is found, we return `nil`.\n\nYou can call this function with a part as an argument to get the first part it hits that has a ground.",
+        "syntax_ok": false,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that tweens a part's transparency to 1 over 2 seconds using TweenService.",
+        "response": "Certainly! Below is a Luau function that uses the `TweenService` to tween the transparency of a part to 1 over 2 seconds:\n\n```lua\nlocal TweenService = game:GetService(\"TweenService\")\n\nlocal function TweenPartTransparency(part: Instance, duration: number, easing: EasingStyle = Enum.EasingStyle.InOutQuint)\n    local tweenInfo = TweenInfo.new(duration, easing)\n    local tween = TweenService:Create(part, tweenInfo, {Transparency = 1})\n\n    return tween\nend\n```\n\nYou can use this function like this:\n\n```lua\nlocal myPart = script.Parent\nlocal myTween = TweenPartTransparency(myPart, 2)\n```\n\nThis will create a tween that changes the transparency of `myPart` to 1 over 2 seconds. The `easing` parameter allows you to specify the type of easing effect. The default value is `Enum.EasingStyle.InOutQuint`, but you can change it to any other easing style available in the `Enum.EasingStyle` enumeration.\n\nTo stop the tween, you can use the `Stop()` method:\n\n```lua\nmyTween:Stop()\n```\n\nThis will immediately stop the tween, regardless of its current progress.",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that saves player data to a DataStore, with pcall error handling.",
+        "response": "Certainly! Below is a Lua function that saves player data to a DataStore, with pcall error handling to prevent crashes if the player does not exist or if there is an issue with the DataStore operations.\n\n```lua\nlocal DataStoreService = game:GetService(\"DataStoreService\")\nlocal Players = game:GetService(\"Players\")\nlocal player = Players.LocalPlayer\n\nfunction SavePlayerData(player, data)\n    -- Create or update the player's DataStore entry\n    local ds = DataStoreService:GetAsyncStoreFromId(\"PlayerData\", player.UserId)\n    if not ds then\n        ds = DataStoreService:CreateAsyncStoreFromId(\"PlayerData\", player.UserId)\n    end\n\n    -- Use pcall to handle any potential errors\n    local success, err = pcall(function()\n        ds:UpdateAsync(player.UserId, data)\n    end)\n\n    if not success then\n        print(\"Error saving player data: \" .. err)\n    else\n        print(\"Player data saved successfully!\")\n    end\nend\n\n-- Example usage:\nlocal data = {\n    Level = 10,\n    Experience = 1000,\n    Coins = 500\n}\n\nSavePlayerData(player, data)\n```\n\n### Explanation:\n1. **DataStoreService**: This is a service that allows you to store data that can be accessed from different servers or clients.\n2. **Players**: This service provides access to all players connected to the game.\n3. **LocalPlayer**: This is a reference to the player who is currently playing the game.\n4. **SavePlayerData**: This function takes a player object and a table of data as arguments.\n5. **CreateAsyncStoreFromId**: If the DataStore does not already exist for the player, it creates one.\n6. **UpdateAsync**: This function updates the player's DataStore entry with the provided data.\n7. **pcall**: This function wraps the `UpdateAsync` call to handle any potential errors gracefully.\n8. **Error Handling**: If the `UpdateAsync` call fails, it prints an error message; otherwise, it prints a success message.\n\nYou can call this function with the current player object and the data you want to save. This ensures that the player's data is saved safely and with minimal risk of errors.",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that returns true if a table is empty.",
+        "response": "Certainly! Below is a Lua script that defines a function `isEmptyTable` that checks if a table is empty or not:\n\n```lua\n-- Function to check if a table is empty\nfunction isEmptyTable(tbl)\n    -- Check if the table is nil or empty\n    return tbl == nil or next(tbl) == nil\nend\n\n-- Example usage\nlocal myTable = {}\nlocal anotherTable = {1, 2, 3}\n\nprint(isEmptyTable(myTable))  -- Output: true\nprint(isEmptyTable(anotherTable)) -- Output: false\n```\n\n### Explanation:\n- The function `isEmptyTable` takes a single parameter, `tbl`, which is the table to check.\n- Inside the function, it first checks if the table is `nil` or if the `next` function returns `nil`. If either condition is true, the function returns `true`, indicating that the table is empty.\n- If neither condition is true, the function returns `false`, indicating that the table is not empty.\n\nThis function is useful for quickly determining if a table has any elements without iterating through it.",
+        "syntax_ok": false,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that clones a template part and parents it to workspace.",
+        "response": "Certainly! Below is a Lua function that clones a template part and parents it to the workspace:\n\n```lua\nfunction cloneAndParent(templatePart)\n    -- Create a copy of the template part\n    local clonedPart = templatePart:Clone()\n    \n    -- Move the cloned part to the workspace\n    clonedPart.Parent = workspace\nend\n```\n\nTo use this function, you can simply pass the template part you want to clone as an argument:\n\n```lua\n-- Example usage\nlocal templatePart = script.Parent -- Replace with your template part reference\ncloneAndParent(templatePart)\n```\n\nThis function works by first cloning the template part using `Clone()`, which creates an independent copy of the part. Then, it sets the `Parent` property of the cloned part to the `workspace`, which places it in the workspace's hierarchy.",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that connects to PlayerAdded and prints the player's name.",
+        "response": "Certainly! Below is a Lua script that defines a function that connects to the `PlayerAdded` event and prints the name of the player who joined the game.\n\n```lua\n-- Define the function that prints the player's name\nfunction printPlayerName(player)\n    print(\"Player added: \" .. player.Name)\nend\n\n-- Connect to the PlayerAdded event\ngame.Players.PlayerAdded:Connect(printPlayerName)\n```\n\nTo use this script in your game, you need to add it to a server script or a file that is loaded by the game. Here\u2019s how you might add it to a server script:\n\n1. Open a text editor.\n2. Copy the Lua script provided above.\n3. Save the file with a `.lua` extension, for example, `PrintPlayerName.lua`.\n4. In the game, go to the `ServerScriptService` in the Explorer window.\n5. Click on the `ServerScriptService` and then click on the `+` button to add a new script.\n6. Paste the Lua script into the new script.\n7. Press `Ctrl+S` to save the script.\n8. Restart the game to see the `PlayerAdded` event in action.\n\nThis script will print the name of the player who joins the game to the console.",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function implementing a basic state machine with states 'Idle' and 'Running'.",
+        "response": "Certainly! Below is a simple implementation of a basic state machine in Lua using the Luau programming language. This state machine has two states: 'Idle' and 'Running'. The `State` class represents the states, and the `StateMachine` class manages the transitions between these states.\n\n```lua\n-- Define the State class\nState = {}\n\n-- Initialize the State class\nfunction State.new(name)\n    local self = {\n        name = name\n    }\n    return self\nend\n\n-- Define the StateMachine class\nStateMachine = {}\n\n-- Initialize the StateMachine class\nfunction StateMachine.new()\n    self.states = {}\n    self.currentState = nil\nend\n\n-- Add a state to the state machine\nfunction StateMachine:addState(state)\n    self.states[state.name] = state\nend\n\n-- Set the current state\nfunction StateMachine:setState(state)\n    if self.states[state] then\n        self.currentState = state\n        print(\"Current state: \" .. state.name)\n    else\n        print(\"State '\" .. state .. \"' does not exist.\")\n    end\nend\n\n-- Transition to a new state\nfunction StateMachine:transition(newState)\n    self:setState(newState)\nend\n\n-- Example usage\nlocal function idleState()\n    print(\"State Idle: Running operations...\")\nend\n\nlocal function runningState()\n    print(\"State Running: Pausing operations...\")\nend\n\nlocal stateMachine = StateMachine.new()\nlocal idle = State:new(\"Idle\")\nlocal running = State:new(\"Running\")\n\nstateMachine:addState(idle)\nstateMachine:addState(running)\n\nstateMachine:setState(idle)\nstateMachine:transition(running)\n```\n\n### Explanation:\n1. **State Class**:\n   - The `State` class is defined with a constructor that takes a name as an argument and initializes the state with a name.\n   - The `new` function returns a new instance of the `State` class.\n\n2. **StateMachine Class**:\n   - The `StateMachine` class is defined with a constructor that initializes an empty table to store states and sets the current state to `nil`.\n   - The `addState` function adds a state to the state machine.\n   - The `setState` function sets the current state to the specified state. It also prints a message to indicate the current state.\n   - The `transition` function changes the current state to a new state.\n\n3. **Example Usage**:\n   - The `idleState` and `runningState` functions are defined to simulate different states.\n   - A new `StateMachine` instance is created.\n   - States 'Idle' and 'Running' are added to the state machine.\n   - The state machine is set to 'Idle' and then transitions to 'Running'.\n\nThis simple state machine can be extended with more complex behavior and transitions based on specific conditions or events in your application.",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that binds an action to a key using ContextActionService.",
+        "response": "Certainly! Below is a Lua function that binds an action to a key using the `ContextActionService` in Roblox:\n\n```lua\n-- Import the ContextActionService\nlocal ContextActionService = game:GetService(\"ContextActionService\")\n\n-- Define the action to bind to the key\nlocal actionName = \"MyKeyBindingAction\"\nlocal keyName = \"r\"\n\n-- Create a function to be executed when the key is pressed\nlocal function onKeyPressed(action)\n    print(\"Key pressed:\", action)\n    -- Add your custom code here\nend\n\n-- Create the action with the defined name and key\nlocal action = ContextActionService:BindAction(actionName, onKeyPressed, false, keyName)\n\n-- Optionally, you can unbind the action later\nfunction unbindAction()\n    ContextActionService:UnbindAction(action)\nend\n```\n\n### Explanation:\n\n1. **Importing the ContextActionService**: This is necessary to interact with the `ContextActionService` in Roblox.\n\n2. **Defining the Action Name and Key**: These are the names that will be used to identify the action and the key.\n\n3. **Creating the Function to Execute when the Key is Pressed**: This function is what will be executed when the key is pressed. You can replace the print statement with your own custom code.\n\n4. **Creating the Action**: The `ContextActionService:BindAction` function is used to create the action. The parameters are:\n   - `actionName`: The name of the action.\n   - `onKeyPressed`: The function to be executed when the action is pressed.\n   - `isToggle`: `false` means the action is non-toggleable. If set to `true`, the action will be toggled.\n   - `keyName`: The name of the key to bind to the action.\n\n5. **Unbinding the Action**: The `ContextActionService:UnbindAction` function can be used to remove the action if needed.\n\nYou can call the `unbindAction` function if you want to remove the action from the `ContextActionService`.",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that creates a BindableEvent and fires it.",
+        "response": "```lua\n-- Import the BindableEvent module\nlocal BindableEvent = game:GetService(\"BindableEvent\")\n\n-- Define a function to create and fire a BindableEvent\nfunction createAndFireEvent(eventName)\n    -- Create a new BindableEvent\n    local event = BindableEvent.new(eventName)\n\n    -- Fire the event\n    event:Fire()\nend\n\n-- Example usage\ncreateAndFireEvent(\"ExampleEvent\")\n```\n\nIn this solution, we first import the `BindableEvent` module from the game service. Then, we define a function `createAndFireEvent` that takes an event name as a parameter. Inside the function, we create a new `BindableEvent` using the `new` method. After creating the event, we fire it using the `Fire` method. This example demonstrates how to create a simple event and have it executed.",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that formats a number with comma separators, e.g. 1234567 -> '1,234,567'.",
+        "response": "Certainly! Below is a Lua function that formats a number with comma separators:\n\n```lua\nfunction formatNumberWithCommas(num)\n    -- Convert the number to a string\n    local strNum = tostring(num)\n    \n    -- Find the length of the string and reverse it\n    local len = #strNum\n    local reversedStr = \"\"\n    for i = len, 1, -1 do\n        reversedStr = reversedStr .. strNum:sub(i, i)\n    end\n    \n    -- Split the reversed string into groups of three digits\n    local groups = {}\n    for i = 1, len, 3 do\n        table.insert(groups, reversedStr:sub(i, i + 2))\n    end\n    \n    -- Join the groups with commas and reverse the result\n    local formattedStr = table.concat(groups, \",\")\n    return formattedStr:reverse()\nend\n\n-- Example usage\nprint(formatNumberWithCommas(1234567))  -- Output: '1,234,567'\n```\n\n### Explanation:\n1. **Convert the number to a string**: `tostring(num)`\n2. **Reverse the string**: This is necessary because the digits need to be grouped from right to left, and reversing the string allows us to do that.\n3. **Split the reversed string into groups of three digits**: We use a for loop to iterate over the string in steps of 3. For each group, we extract the first two characters (which form a three-digit number) and insert it into the `groups` table.\n4. **Join the groups with commas**: We use `table.concat(groups, \",\")` to concatenate the groups with commas.\n5. **Reverse the result**: Finally, we reverse the concatenated string to get the correct order.\n\nThis function should work correctly for any number, including negative numbers.",
+        "syntax_ok": false,
+        "keyword_hit_rate": 1.0
+      }
+    ]
+  },
+  "luau-coder": {
+    "summary": {
+      "model": "luau-coder",
+      "syntax_ok_rate": 0.9333333333333333,
+      "avg_keyword_hit_rate": 0.8222222222222223
+    },
+    "records": [
+      {
+        "prompt": "Write a Luau function that returns the sum of a table of numbers.",
+        "response": "```lua\r\nlocal function sum(numbers: {number}): number\r\n    return table.reduce(numbers, function(sum: number, value: number): number\r\n        return sum + value\r\n    end, 0)\r\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau script that fires a RemoteEvent named 'Damage' from a LocalScript to the server, passing an amount parameter.",
+        "response": "```lua\r\n-- Create a RemoteEvent on the ServerScriptService\nlocal Damage = signal(ServerScriptService:WaitForChild(\"Damage\"))\n\n-- Connect to the Damage event and print the passed amount\nDamage:Connect(function(amount)\n    print(`You were damaged by {amount}!`)\nend)\n\n-- Fire the Damage event from the LocalScript with an amount of 10\nDamage:Fire(10)\n```",
+        "syntax_ok": true,
+        "keyword_hit_rate": 0.5
+      },
+      {
+        "prompt": "Write a Luau ModuleScript that implements a simple class with a constructor and a method, using metatables.",
+        "response": "```lua\nlocal Class = {}\n\nfunction Class.new()\n    local instance = {}\n    setmetatable(instance, Class)\n    return instance\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 0.5
+      },
+      {
+        "prompt": "Write a Luau function that debounces rapid calls, only allowing one call per second.",
+        "response": "```lua\r\nlocal debounce = function(f: () -> ())\n    local lastCallTime = 0\n    return function(...)\n        if os.clock() - lastCallTime < 1 then\n            return\n        end\n        f(...)\n        lastCallTime = os.clock()\n    end\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 0.3333333333333333
+      },
+      {
+        "prompt": "Write Luau server script code that listens for a RemoteEvent 'Damage' via OnServerEvent and applies damage to a humanoid.",
+        "response": "```lua\r\nlocal Players = game:GetService(\"Players\")\r\nlocal RunService = game:GetService(\"RunService\")\r\n\r\nlocal function DamagePlayer(Player: Player, Amount: number)\r\n    local Humanoid = Player.Character:FindFirstChildOfClass(\"Humanoid\") :: Humanoid?\r\n    if Humanoid == nil then return end\r\n\r\n    Humanoid.Health -= Amount\r\nend\r\n\r\nlocal DamageEvent = createRemote(\"Damage\")\r\nDamageEvent.OnServerEvent:Connect(DamagePlayer)\r\n\r\nRunService.Heartbeat:Connect(function()\r\n    for _, Player in Players:GetPlayers() do\r\n        local Character = Player.Character\r\n        if Character == nil then continue end\r\n\r\n        local Humanoid = Character:FindFirstChildOfClass(\"Humanoid\") :: Humanoid?\r\n        if Humanoid == nil then continue end\r\n\r\n        if Humanoid.Health <= 0 then\r\n            print(`{Player.Name} died!`)\r\n        end\r\n    end\r\nend",
+        "syntax_ok": false,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that performs a raycast from a part's position downward to check for ground.",
+        "response": "```lua\r\nlocal function GetGroundPart(p: Instance): Instance?\r\n    local pos = p.Position\n    local ray = Ray.new(pos, Vector3.new(0, -1, 0))\n    local hit, part = workspace:Raycast(ray)\n    if not hit then return nil end\n\n    -- Check if the hit part is a physical part (not a model or other non-physical object)\r\n    if typeof(hit.Parent) ~= \"PhysicalProperties\" and typeof(hit.Parent) ~= \"BasePart\" then\r\n        return nil\r\n    end\r\n\r\n    return hit.Parent\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that tweens a part's transparency to 1 over 2 seconds using TweenService.",
+        "response": "```lua\r\nlocal RunService = game:GetService(\"RunService\")\r\nlocal TweenService = game:GetService(\"TweenService\")\r\n\r\nlocal function fadeOut(part: Instance)\r\n\tlocal tween = TweenService.Create(\r\n\t\tpart,\r\n\t\tTweenService.TransitionTypes.QuinticInOut,\r\n\t\t{Transparency = 1},\r\n\t\t2\r\n\t)\r\n\r\n\ttween:Play()\r\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 0.5
+      },
+      {
+        "prompt": "Write a Luau function that saves player data to a DataStore, with pcall error handling.",
+        "response": "```lua\r\nlocal function SavePlayerData(Player: Player)\r\n    local PlayerData = GetPlayerData(Player)\n    if not PlayerData then return end\n\n    local Success, ErrorString = pcall(function()\n        GameService.DataStoreService:SetAsync(\"Players\", Player.UserId, PlayerData)\n    end)\n\n    if not Success then\n        warn(`Error saving player data: {ErrorString}`)\n    end\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that returns true if a table is empty.",
+        "response": "```lua\r\nlocal function IsEmpty(tbl: { [unknown]: unknown }): boolean\r\n    return #tbl == 0\r\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that clones a template part and parents it to workspace.",
+        "response": "```lua\r\nlocal function CloneAndParentToWorkspace(templatePart: Instance)\r\n    local clone = templatePart:Clone()\r\n    clone.Parent = game.Workspace\r\n    return clone\r\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that connects to PlayerAdded and prints the player's name.",
+        "response": "```lua\r\nlocal Players = game:GetService(\"Players\")\r\n\r\nPlayers.PlayerAdded:Connect(function(player)\r\n    print(`Player {player.Name} has joined.`)\r\nend)\n```",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function implementing a basic state machine with states 'Idle' and 'Running'.",
+        "response": "```lua\r\nlocal function createStateMachine()\r\n    local currentState: string? = \"Idle\"\r\n    return {\r\n        Idle = {\r\n            Enter = function(self)\r\n                print(\"Entering Idle\")\r\n            end,\r\n            Execute = function(self)\r\n                if game:GetService(\"RunService\").Heartbeat then\r\n                    currentState = \"Running\"\r\n                end\r\n            end,\r\n            Exit = function(self)\r\n                print(\"Exiting Idle\")\r\n            end,\r\n        },\r\n        Running = {\r\n            Enter = function(self)\r\n                print(\"Entering Running\")\r\n            end,\r\n            Execute = function(self)\r\n                if game:GetService(\"RunService\").Heartbeat then\r\n                    currentState = \"Idle\"\r\n                end\r\n            end,\r\n            Exit = function(self)\r\n                print(\"Exiting Running\")\r\n            end,\r\n        },\r\n    }\r\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that binds an action to a key using ContextActionService.",
+        "response": "```lua\r\nlocal function bindKey(action: string, keyName: string)\r\n    local function callback(inputState: Enum.UserInputState, inputObject: unknown)\r\n        if inputState == Enum.UserInputState.Begin then\r\n            game:GetService(\"ContextActionService\"):FireServer(action, true)\r\n        elseif inputState == Enum.UserInputState.End then\r\n            game:GetService(\"ContextActionService\"):FireServer(action, false)\r\n        end\r\n    end\r\n\r\n    return bindKey\r\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 0.5
+      },
+      {
+        "prompt": "Write a Luau function that creates a BindableEvent and fires it.",
+        "response": "```lua\r\nlocal function createAndFireBindableEvent()\r\n    local event = CreateBindableEvent(\"TestEvent\")\r\n    event:Fire(123)\r\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      },
+      {
+        "prompt": "Write a Luau function that formats a number with comma separators, e.g. 1234567 -> '1,234,567'.",
+        "response": "```lua\r\nlocal function formatNumber(num: number): string\r\n    return `{math.floor(num)}`:gsub(\"%d\", \"%03d\"):gsub(\"^(-?)0+(%d)\", \"%1,%2\")\r\nend",
+        "syntax_ok": true,
+        "keyword_hit_rate": 1.0
+      }
+    ]
+  }
+}
