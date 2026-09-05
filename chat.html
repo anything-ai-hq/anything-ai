@@ -71,10 +71,11 @@
 
   #ollamaOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; z-index: 20; }
   #ollamaOverlay.open { display: flex; }
-  #ollamaPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 28px; width: 400px; text-align: center; }
+  #ollamaPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 28px; width: 460px; max-width: 90vw; text-align: center; max-height: 85vh; overflow-y: auto; }
   #ollamaPanel h3 { margin-top: 0; }
   #ollamaPanel p { color: #aaa; font-size: 14px; line-height: 1.5; }
-  #ollamaPanel code { background: #2a2a2a; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  #ollamaPanel li { color: #aaa; font-size: 14px; }
+  #ollamaPanel code { background: #2a2a2a; padding: 2px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; display: inline-block; margin-top: 4px; }
   .ollama-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
   #installOllama { background: #2d5a9e; display: block; text-decoration: none; padding: 10px 18px; border-radius: 6px; color: white; }
   #retryOllama, #continueAnyway { background: #444; }
@@ -713,7 +714,16 @@ async function checkOllama() {
     overlay.classList.remove("open");
   } catch {
     title.textContent = "Can't reach Ollama";
-    message.innerHTML = `Either it's not installed on this device, or it's installed but blocking this site (Ollama only allows <code>localhost</code> origins by default).<br><br>If it's already installed, set <code>OLLAMA_ORIGINS=${location.origin}</code> before starting <code>ollama serve</code>, then retry.`;
+    message.innerHTML = `
+      <p style="text-align:left; margin:0 0 10px;">Don't have Ollama? Click "Install" below.</p>
+      <p style="text-align:left; margin:0 0 6px;"><strong>Already have it installed?</strong> It's blocking this site by default. Fix it:</p>
+      <ol style="text-align:left; margin:0; padding-left:20px; line-height:1.6;">
+        <li>Open <strong>PowerShell</strong> (press Win key, type PowerShell, Enter)</li>
+        <li>Paste this, press Enter:<br><code>setx OLLAMA_ORIGINS "${location.origin}"</code></li>
+        <li>Fully quit Ollama — right-click its icon near the clock (bottom-right) → <strong>Quit</strong></li>
+        <li>Reopen Ollama, wait ~10 seconds</li>
+        <li>Click Retry below</li>
+      </ol>`;
     const install = document.createElement("a");
     install.id = "installOllama";
     install.href = "https://ollama.com/download";
