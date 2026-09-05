@@ -17,7 +17,7 @@
   #newChatBtn, #settingsBtn, #agentsBtn { padding: 8px; border: 1px solid #444; border-radius: 6px; background: #262626; color: #ddd; cursor: pointer; text-align: left; }
   #newChatBtn:hover, #settingsBtn:hover, #agentsBtn:hover { background: #333; }
   #settingsBtn { margin-top: auto; }
-  #agentSelect, #modelSelect { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin-bottom: 4px; }
+  #agentSelect { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin-bottom: 4px; }
 
   #greeting { padding: 8px 4px 4px; font-size: 14px; color: #ddd; }
   #greeting .logout { display: block; margin-top: 2px; font-size: 12px; color: #888; cursor: pointer; }
@@ -30,8 +30,10 @@
   .user { background: #2d5a9e; align-self: flex-end; }
   .assistant { background: #333; align-self: flex-start; font-family: ui-monospace, monospace; }
   .info { background: transparent; border: 1px dashed #444; color: #999; align-self: center; font-size: 13px; font-family: ui-monospace, monospace; max-width: 100%; }
-  #inputRow { display: flex; gap: 8px; }
+  #inputRow { display: flex; gap: 8px; align-items: center; }
   #prompt { flex: 1; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; }
+  .pill { padding: 8px 10px; background: #2a2a2a; color: #bbb; border: 1px solid #444; border-radius: 999px; font-size: 13px; cursor: pointer; }
+  .pill:hover { background: #333; color: #ddd; }
   button { padding: 10px 18px; border: none; border-radius: 6px; background: #2d5a9e; color: white; cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: default; }
 
@@ -68,7 +70,6 @@
 
 <div id="sidebar">
   <div id="greeting"></div>
-  <select id="modelSelect"></select>
   <select id="agentSelect"></select>
   <button id="newChatBtn">+ New chat</button>
   <h3>Chats</h3>
@@ -81,6 +82,8 @@
   <div id="log"></div>
   <div id="inputRow">
     <input id="prompt" placeholder="Ask for some Luau code..." autofocus>
+    <select id="modelSelect" class="pill"></select>
+    <select id="effortSelect" class="pill"></select>
     <button id="send">Send</button>
   </div>
 </div>
@@ -154,6 +157,17 @@ const MODELS = {
   },
 };
 const DEFAULT_MODEL_ID = "koda";
+
+// "Effort" maps to real generation knobs (temperature, response length) plus
+// a system-prompt nudge — these models don't have a distinct reasoning mode
+// to toggle, so this is the honest equivalent: more effort = slower, longer,
+// more careful; less effort = fast and terse.
+const EFFORT = {
+  low: { label: "Low effort", options: { temperature: 0.2, num_predict: 256 }, nudge: "Be brief and direct." },
+  medium: { label: "Medium effort", options: { temperature: 0.4, num_predict: 512 }, nudge: "" },
+  high: { label: "High effort", options: { temperature: 0.6, num_predict: 1024 }, nudge: "Think through edge cases carefully before answering, and explain your reasoning." },
+};
+const DEFAULT_EFFORT_ID = "medium";
 
 const PERSONA = {
   enthusiasm: {
@@ -289,7 +303,11 @@ function saveAgents(a) { localStorage.setItem("luau_agents", JSON.stringify(a));
 let agents = loadAgents();
 let currentAgentId = localStorage.getItem("luau_current_agent_id") || "";
 let currentModelId = localStorage.getItem("luau_current_model_id") || DEFAULT_MODEL_ID;
+let currentEffortId = localStorage.getItem("luau_current_effort_id") || DEFAULT_EFFORT_ID;
 
+// Model/effort pills live next to Send, ChatGPT-style: they show and control
+// the *active chat's* choice (persisted per chat), falling back to the last
+// global choice when there's no active chat yet (e.g. before the first message).
 function renderModelSelect() {
   const sel = document.getElementById("modelSelect");
   sel.innerHTML = "";
@@ -299,7 +317,21 @@ function renderModelSelect() {
     opt.textContent = m.label;
     sel.appendChild(opt);
   }
-  sel.value = currentModelId;
+  const chat = getActiveChat();
+  sel.value = chat?.model || currentModelId;
+}
+
+function renderEffortSelect() {
+  const sel = document.getElementById("effortSelect");
+  sel.innerHTML = "";
+  for (const [id, e] of Object.entries(EFFORT)) {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = e.label;
+    sel.appendChild(opt);
+  }
+  const chat = getActiveChat();
+  sel.value = chat?.effort || currentEffortId;
 }
 
 function renderAgentSelect() {
@@ -350,16 +382,22 @@ function getModel(chat) {
   return MODELS[chat?.model] || MODELS[DEFAULT_MODEL_ID];
 }
 
+function getEffort(chat) {
+  return EFFORT[chat?.effort] || EFFORT[DEFAULT_EFFORT_ID];
+}
+
 function buildSystemPrompt(chat) {
   const parts = [getModel(chat).system, PERSONA.enthusiasm[settings.enthusiasm], PERSONA.emojis[settings.emojis], PERSONA.sarcasm[settings.sarcasm]];
   const agent = chat && agents.find((a) => a.id === chat.agentId);
   if (agent) parts.push("Persona for this chat: " + agent.prompt);
+  const effortNudge = getEffort(chat).nudge;
+  if (effortNudge) parts.push(effortNudge);
   if (memory.length) parts.push("Known context about the user/project from past chats: " + memory.join("; "));
   return parts.join(" ");
 }
 
 function newChat() {
-  const chat = { id: crypto.randomUUID(), title: "New chat", messages: [], agentId: currentAgentId || null, model: currentModelId };
+  const chat = { id: crypto.randomUUID(), title: "New chat", messages: [], agentId: currentAgentId || null, model: currentModelId, effort: currentEffortId };
   chats.unshift(chat);
   activeChatId = chat.id;
   persist();
@@ -421,6 +459,8 @@ function renderLog() {
 function render() {
   renderChatList();
   renderLog();
+  renderModelSelect();
+  renderEffortSelect();
 }
 
 // Plugins = slash commands. Two kinds: LOCAL_COMMANDS run entirely client-side
@@ -514,7 +554,7 @@ async function send() {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: getModel(chat).ollama, messages: apiMessages(chat), system: buildSystemPrompt(chat), stream: true }),
+      body: JSON.stringify({ model: getModel(chat).ollama, messages: apiMessages(chat), system: buildSystemPrompt(chat), options: getEffort(chat).options, stream: true }),
     });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -570,6 +610,14 @@ document.getElementById("loginName").addEventListener("keydown", (e) => { if (e.
 document.getElementById("modelSelect").addEventListener("change", (e) => {
   currentModelId = e.target.value;
   localStorage.setItem("luau_current_model_id", currentModelId);
+  const chat = getActiveChat();
+  if (chat) { chat.model = currentModelId; persist(); }
+});
+document.getElementById("effortSelect").addEventListener("change", (e) => {
+  currentEffortId = e.target.value;
+  localStorage.setItem("luau_current_effort_id", currentEffortId);
+  const chat = getActiveChat();
+  if (chat) { chat.effort = currentEffortId; persist(); }
 });
 document.getElementById("agentSelect").addEventListener("change", (e) => {
   currentAgentId = e.target.value;
@@ -602,7 +650,6 @@ if (!activeChatId || !getActiveChat()) {
 render();
 renderGreeting();
 renderAgentSelect();
-renderModelSelect();
 if (!loadUsername()) showLogin();
 </script>
 </body>
