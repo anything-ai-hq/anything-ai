@@ -1,6 +1,6 @@
-# luau-coder
+# Soi & Koda
 
-Local, cheap Luau/Roblox coding model: scrape -> LoRA fine-tune -> GGUF -> Ollama -> Studio plugin.
+Two local Ollama models behind one web chat: **Koda** is a Luau/Roblox coder (LoRA fine-tuned from Qwen2.5-Coder-1.5B-Instruct), **Soi** is an everyday assistant (same base, general-purpose system prompt). Pipeline: scrape -> LoRA fine-tune -> GGUF -> Ollama -> web chat / Studio plugin.
 
 ## Setup
 ```
@@ -14,8 +14,21 @@ set GITHUB_TOKEN=ghp_xxx          # optional, raises GitHub rate limit
 .venv\Scripts\python scrape_dataset.py
 .venv\Scripts\python train_lora.py
 .venv\Scripts\python export_gguf.py
-ollama create luau-coder -f models_gguf\Modelfile
+ollama create Koda -f models_gguf\Modelfile
 .venv\Scripts\python test_smoke.py
+```
+
+Soi (everyday assistant) needs no training — it's the same base model with a general-purpose system prompt instead of Koda's Luau-focused one:
+```
+ollama pull qwen2.5-coder:1.5b-instruct
+```
+```Modelfile
+FROM qwen2.5-coder:1.5b-instruct
+SYSTEM """You are Soi, a friendly, helpful everyday assistant. Answer clearly and directly across any topic — general questions, writing, planning, advice, casual conversation. You can help with code too, but for deep Roblox/Luau work, Koda is the better tool."""
+PARAMETER temperature 0.7
+```
+```
+ollama create Soi -f Modelfile
 ```
 
 ## Web chat
@@ -23,7 +36,7 @@ ollama create luau-coder -f models_gguf\Modelfile
 ollama serve                      # if not already running
 .venv\Scripts\python -m http.server 8000
 ```
-Open http://localhost:8000/chat.html — plain HTML/JS, talks straight to Ollama's API (CORS-allowed for localhost origins by default). No build step, no framework.
+Open http://localhost:8000/chat.html — plain HTML/JS, talks straight to Ollama's API (CORS-allowed for localhost origins by default). No build step, no framework. Model dropdown in the sidebar switches between Soi and Koda per chat.
 
 ## Studio plugin
 Copy `studio_plugin/AICoder.lua` into `%LOCALAPPDATA%\Roblox\Plugins\`.

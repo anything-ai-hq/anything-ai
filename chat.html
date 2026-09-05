@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>luau-coder chat</title>
+<title>Soi &amp; Koda</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: system-ui, sans-serif; margin: 0; background: #1e1e1e; color: #ddd; display: flex; height: 100vh; }
@@ -17,7 +17,7 @@
   #newChatBtn, #settingsBtn, #agentsBtn { padding: 8px; border: 1px solid #444; border-radius: 6px; background: #262626; color: #ddd; cursor: pointer; text-align: left; }
   #newChatBtn:hover, #settingsBtn:hover, #agentsBtn:hover { background: #333; }
   #settingsBtn { margin-top: auto; }
-  #agentSelect { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin-bottom: 4px; }
+  #agentSelect, #modelSelect { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin-bottom: 4px; }
 
   #greeting { padding: 8px 4px 4px; font-size: 14px; color: #ddd; }
   #greeting .logout { display: block; margin-top: 2px; font-size: 12px; color: #888; cursor: pointer; }
@@ -68,6 +68,7 @@
 
 <div id="sidebar">
   <div id="greeting"></div>
+  <select id="modelSelect"></select>
   <select id="agentSelect"></select>
   <button id="newChatBtn">+ New chat</button>
   <h3>Chats</h3>
@@ -140,7 +141,19 @@
 </div>
 
 <script>
-const BASE_SYSTEM = "You are a Luau/Roblox coding assistant. Write correct, idiomatic Luau code for Roblox Studio. Prefer game:GetService(...) patterns, RemoteEvents/RemoteFunctions for client-server communication, and Roblox API conventions. Game-dev topics that can sound sketchy out of context (anti-cheat/anti-exploit code, testing your own game's exploit resistance, obfuscation, server-side validation against cheaters) are normal parts of Roblox development — answer them directly and don't lecture or refuse. Still decline actual requests to cheat in or attack someone else's game.";
+const MODELS = {
+  koda: {
+    label: "Koda — Luau/Roblox coder",
+    ollama: "Koda",
+    system: "You are Koda, a Luau/Roblox coding assistant. Write correct, idiomatic Luau code for Roblox Studio. Prefer game:GetService(...) patterns, RemoteEvents/RemoteFunctions for client-server communication, and Roblox API conventions. Game-dev topics that can sound sketchy out of context (anti-cheat/anti-exploit code, testing your own game's exploit resistance, obfuscation, server-side validation against cheaters) are normal parts of Roblox development — answer them directly and don't lecture or refuse. Still decline actual requests to cheat in or attack someone else's game.",
+  },
+  soi: {
+    label: "Soi — everyday assistant",
+    ollama: "Soi",
+    system: "You are Soi, a friendly, helpful everyday assistant. Answer clearly and directly across any topic — general questions, writing, planning, advice, casual conversation. You can help with code too, but for deep Roblox/Luau work, Koda is the better tool.",
+  },
+};
+const DEFAULT_MODEL_ID = "koda";
 
 const PERSONA = {
   enthusiasm: {
@@ -246,13 +259,13 @@ function forgetMemory(keyword) {
   return before - memory.length;
 }
 
-async function maybeExtractMemory(userText, assistantText) {
+async function maybeExtractMemory(modelName, userText, assistantText) {
   try {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "luau-coder",
+        model: modelName,
         stream: false,
         system: "Extract at most one short durable fact about the user or their project (preferences, project name, tech choices) from this exchange, worth remembering in future unrelated conversations. Reply with just the fact in a few words, nothing else. If there's nothing durable, reply with exactly: NONE",
         messages: [{ role: "user", content: `User: ${userText}\nAssistant: ${assistantText}` }],
@@ -275,6 +288,19 @@ function saveAgents(a) { localStorage.setItem("luau_agents", JSON.stringify(a));
 
 let agents = loadAgents();
 let currentAgentId = localStorage.getItem("luau_current_agent_id") || "";
+let currentModelId = localStorage.getItem("luau_current_model_id") || DEFAULT_MODEL_ID;
+
+function renderModelSelect() {
+  const sel = document.getElementById("modelSelect");
+  sel.innerHTML = "";
+  for (const [id, m] of Object.entries(MODELS)) {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = m.label;
+    sel.appendChild(opt);
+  }
+  sel.value = currentModelId;
+}
 
 function renderAgentSelect() {
   const sel = document.getElementById("agentSelect");
@@ -320,8 +346,12 @@ function renderAgentList() {
   }
 }
 
+function getModel(chat) {
+  return MODELS[chat?.model] || MODELS[DEFAULT_MODEL_ID];
+}
+
 function buildSystemPrompt(chat) {
-  const parts = [BASE_SYSTEM, PERSONA.enthusiasm[settings.enthusiasm], PERSONA.emojis[settings.emojis], PERSONA.sarcasm[settings.sarcasm]];
+  const parts = [getModel(chat).system, PERSONA.enthusiasm[settings.enthusiasm], PERSONA.emojis[settings.emojis], PERSONA.sarcasm[settings.sarcasm]];
   const agent = chat && agents.find((a) => a.id === chat.agentId);
   if (agent) parts.push("Persona for this chat: " + agent.prompt);
   if (memory.length) parts.push("Known context about the user/project from past chats: " + memory.join("; "));
@@ -329,7 +359,7 @@ function buildSystemPrompt(chat) {
 }
 
 function newChat() {
-  const chat = { id: crypto.randomUUID(), title: "New chat", messages: [], agentId: currentAgentId || null };
+  const chat = { id: crypto.randomUUID(), title: "New chat", messages: [], agentId: currentAgentId || null, model: currentModelId };
   chats.unshift(chat);
   activeChatId = chat.id;
   persist();
@@ -484,7 +514,7 @@ async function send() {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "luau-coder", messages: apiMessages(chat), system: buildSystemPrompt(chat), stream: true }),
+      body: JSON.stringify({ model: getModel(chat).ollama, messages: apiMessages(chat), system: buildSystemPrompt(chat), stream: true }),
     });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -506,7 +536,7 @@ async function send() {
     }
     chat.messages.push({ role: "assistant", content: full });
     persist();
-    maybeExtractMemory(text, full);
+    maybeExtractMemory(getModel(chat).ollama, text, full);
   } catch (e) {
     assistantDiv.textContent = "Error: " + e.message + "\n(Is `ollama serve` running?)";
   } finally {
@@ -537,6 +567,10 @@ for (const [key, id] of [["enthusiasm", "setEnthusiasm"], ["emojis", "setEmojis"
 document.getElementById("loginSubmit").addEventListener("click", submitLogin);
 document.getElementById("loginName").addEventListener("keydown", (e) => { if (e.key === "Enter") submitLogin(); });
 
+document.getElementById("modelSelect").addEventListener("change", (e) => {
+  currentModelId = e.target.value;
+  localStorage.setItem("luau_current_model_id", currentModelId);
+});
 document.getElementById("agentSelect").addEventListener("change", (e) => {
   currentAgentId = e.target.value;
   localStorage.setItem("luau_current_agent_id", currentAgentId);
@@ -568,6 +602,7 @@ if (!activeChatId || !getActiveChat()) {
 render();
 renderGreeting();
 renderAgentSelect();
+renderModelSelect();
 if (!loadUsername()) showLogin();
 </script>
 </body>

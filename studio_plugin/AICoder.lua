@@ -1,7 +1,7 @@
--- AICoder: side panel that talks to the local luau-coder Ollama model.
+-- AICoder: side panel that talks to the local Koda Ollama model.
 -- Install: copy this file into %LOCALAPPDATA%\Roblox\Plugins\
 -- Requires: Studio Settings > Security > Allow HTTP Requests, and
---           `ollama create luau-coder -f Modelfile` already run + `ollama serve` running.
+--           `ollama create Koda -f models_gguf/Modelfile` already run + `ollama serve` running.
 
 local toolbar = plugin:CreateToolbar("AI Coder")
 local button = toolbar:CreateButton("Ask AI", "Ask the local Luau model", "")
@@ -64,7 +64,7 @@ askButton.MouseButton1Click:Connect(function()
 	responseBox.Text = "Thinking..."
 	local ok, result = pcall(function()
 		local body = HttpService:JSONEncode({
-			model = "luau-coder",
+			model = "Koda",
 			prompt = promptBox.Text,
 			stream = false,
 		})

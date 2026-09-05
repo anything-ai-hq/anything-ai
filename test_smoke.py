@@ -1,6 +1,6 @@
-"""Smoke test: ask the served Ollama model for Luau code, check it looks like Luau.
+"""Smoke test: ask Koda for Luau code, check it looks like Luau.
 
-Usage: python test_smoke.py   (requires `ollama create luau-coder -f Modelfile` already run)
+Usage: python test_smoke.py   (requires `ollama create Koda -f models_gguf/Modelfile` already run)
 """
 import json
 import sys
@@ -10,7 +10,7 @@ PROMPT = "Write a Luau function that returns the sum of a table of numbers."
 
 
 def main():
-    body = json.dumps({"model": "luau-coder", "prompt": PROMPT, "stream": False}).encode()
+    body = json.dumps({"model": "Koda", "prompt": PROMPT, "stream": False}).encode()
     req = urllib.request.Request(
         "http://localhost:11434/api/generate", data=body,
         headers={"Content-Type": "application/json"},

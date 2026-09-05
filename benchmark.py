@@ -13,8 +13,8 @@ import json
 import re
 import urllib.request
 
-BASE_MODEL = "qwen2.5-coder:1.5b-instruct"  # untuned, same size as luau-coder
-TUNED_MODEL = "luau-coder"
+BASE_MODEL = "qwen2.5-coder:1.5b-instruct"  # untuned, same size as Koda
+TUNED_MODEL = "Koda"
 
 TASKS = [
     ("Write a Luau function that returns the sum of a table of numbers.", ["function", "end"]),
