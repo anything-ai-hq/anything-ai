@@ -4,54 +4,222 @@
 <meta charset="utf-8">
 <title>luau-coder chat</title>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; background: #1e1e1e; color: #ddd; }
-  #log { display: flex; flex-direction: column; gap: 12px; margin-bottom: 1rem; }
-  .msg { padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: #1e1e1e; color: #ddd; display: flex; height: 100vh; }
+
+  #sidebar { width: 220px; background: #171717; border-right: 1px solid #333; display: flex; flex-direction: column; padding: 10px; gap: 6px; overflow-y: auto; }
+  #sidebar h3 { margin: 4px 0 8px; font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .chat-item { padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+  .chat-item:hover { background: #262626; }
+  .chat-item.active { background: #2d5a9e; }
+  .chat-item .del { opacity: 0.4; font-size: 12px; padding: 0 4px; }
+  .chat-item .del:hover { opacity: 1; color: #ff6b6b; }
+  #newChatBtn, #settingsBtn { padding: 8px; border: 1px solid #444; border-radius: 6px; background: #262626; color: #ddd; cursor: pointer; text-align: left; }
+  #newChatBtn:hover, #settingsBtn:hover { background: #333; }
+  #settingsBtn { margin-top: auto; }
+
+  #main { flex: 1; display: flex; flex-direction: column; max-width: 800px; margin: 0 auto; width: 100%; padding: 1.5rem; }
+  #log { flex: 1; display: flex; flex-direction: column; gap: 12px; margin-bottom: 1rem; overflow-y: auto; }
+  .msg { padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; max-width: 90%; }
   .user { background: #2d5a9e; align-self: flex-end; }
   .assistant { background: #333; align-self: flex-start; font-family: ui-monospace, monospace; }
   #inputRow { display: flex; gap: 8px; }
   #prompt { flex: 1; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; }
   button { padding: 10px 18px; border: none; border-radius: 6px; background: #2d5a9e; color: white; cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: default; }
+
+  #settingsOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+  #settingsOverlay.open { display: flex; }
+  #settingsPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 320px; }
+  #settingsPanel h3 { margin-top: 0; }
+  .setting-row { margin-bottom: 16px; }
+  .setting-row label { display: block; margin-bottom: 6px; font-size: 13px; color: #aaa; }
+  .setting-row select { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; }
+  #settingsPanel .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  #closeSettings { background: #444; }
 </style>
 </head>
 <body>
-<h2>luau-coder</h2>
-<div id="log"></div>
-<div id="inputRow">
-  <input id="prompt" placeholder="Ask for some Luau code..." autofocus>
-  <button id="send">Send</button>
+
+<div id="sidebar">
+  <button id="newChatBtn">+ New chat</button>
+  <h3>Chats</h3>
+  <div id="chatList"></div>
+  <button id="settingsBtn">Settings</button>
+</div>
+
+<div id="main">
+  <div id="log"></div>
+  <div id="inputRow">
+    <input id="prompt" placeholder="Ask for some Luau code..." autofocus>
+    <button id="send">Send</button>
+  </div>
+</div>
+
+<div id="settingsOverlay">
+  <div id="settingsPanel">
+    <h3>How should it talk?</h3>
+    <div class="setting-row">
+      <label>Enthusiasm</label>
+      <select id="setEnthusiasm">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label>Emojis</label>
+      <select id="setEmojis">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label>Sarcasm</label>
+      <select id="setSarcasm">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button id="closeSettings">Close</button>
+    </div>
+  </div>
 </div>
 
 <script>
-const log = document.getElementById("log");
-const promptBox = document.getElementById("prompt");
-const sendBtn = document.getElementById("send");
-const messages = [];
+const BASE_SYSTEM = "You are a Luau/Roblox coding assistant. Write correct, idiomatic Luau code for Roblox Studio. Prefer game:GetService(...) patterns, RemoteEvents/RemoteFunctions for client-server communication, and Roblox API conventions.";
+
+const PERSONA = {
+  enthusiasm: {
+    low: "Speak in a neutral, matter-of-fact tone.",
+    medium: "Speak with moderate enthusiasm, some energy but not over the top.",
+    high: "Speak with high enthusiasm and energy, like you're genuinely excited to help.",
+  },
+  emojis: {
+    low: "Do not use emojis.",
+    medium: "Use an emoji occasionally where it fits naturally.",
+    high: "Use emojis liberally throughout your response.",
+  },
+  sarcasm: {
+    low: "Be straightforward, no sarcasm.",
+    medium: "Add light, dry sarcasm sometimes.",
+    high: "Be heavily sarcastic and witty throughout.",
+  },
+};
+
+const DEFAULT_SETTINGS = { enthusiasm: "low", emojis: "low", sarcasm: "low" };
+
+function loadSettings() {
+  try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem("luau_settings")) }; }
+  catch { return { ...DEFAULT_SETTINGS }; }
+}
+function saveSettings(s) { localStorage.setItem("luau_settings", JSON.stringify(s)); }
+
+function loadChats() {
+  try { return JSON.parse(localStorage.getItem("luau_chats")) || []; }
+  catch { return []; }
+}
+function saveChats(chats) { localStorage.setItem("luau_chats", JSON.stringify(chats)); }
+
+let settings = loadSettings();
+let chats = loadChats();
+let activeChatId = localStorage.getItem("luau_active_chat_id");
+
+function buildSystemPrompt() {
+  return [BASE_SYSTEM, PERSONA.enthusiasm[settings.enthusiasm], PERSONA.emojis[settings.emojis], PERSONA.sarcasm[settings.sarcasm]].join(" ");
+}
+
+function newChat() {
+  const chat = { id: crypto.randomUUID(), title: "New chat", messages: [] };
+  chats.unshift(chat);
+  activeChatId = chat.id;
+  persist();
+  render();
+}
+
+function getActiveChat() {
+  return chats.find((c) => c.id === activeChatId) || null;
+}
+
+function persist() {
+  saveChats(chats);
+  if (activeChatId) localStorage.setItem("luau_active_chat_id", activeChatId);
+}
+
+function renderChatList() {
+  const list = document.getElementById("chatList");
+  list.innerHTML = "";
+  for (const chat of chats) {
+    const item = document.createElement("div");
+    item.className = "chat-item" + (chat.id === activeChatId ? " active" : "");
+    const title = document.createElement("span");
+    title.textContent = chat.title;
+    title.style.overflow = "hidden";
+    title.style.textOverflow = "ellipsis";
+    const del = document.createElement("span");
+    del.className = "del";
+    del.textContent = "✕";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      chats = chats.filter((c) => c.id !== chat.id);
+      if (activeChatId === chat.id) activeChatId = chats[0]?.id || null;
+      persist();
+      render();
+    });
+    item.appendChild(title);
+    item.appendChild(del);
+    item.addEventListener("click", () => { activeChatId = chat.id; persist(); render(); });
+    list.appendChild(item);
+  }
+}
+
+function renderLog() {
+  const log = document.getElementById("log");
+  log.innerHTML = "";
+  const chat = getActiveChat();
+  if (!chat) return;
+  for (const m of chat.messages) addBubble(m.role, m.content);
+}
+
+function render() {
+  renderChatList();
+  renderLog();
+}
 
 function addBubble(role, text) {
   const div = document.createElement("div");
   div.className = "msg " + role;
   div.textContent = text;
-  log.appendChild(div);
+  document.getElementById("log").appendChild(div);
   div.scrollIntoView();
   return div;
 }
 
 async function send() {
+  const promptBox = document.getElementById("prompt");
+  const sendBtn = document.getElementById("send");
   const text = promptBox.value.trim();
   if (!text) return;
+
+  let chat = getActiveChat();
+  if (!chat) { newChat(); chat = getActiveChat(); }
+
   promptBox.value = "";
   sendBtn.disabled = true;
-  messages.push({ role: "user", content: text });
-  addBubble("user", text);
+  chat.messages.push({ role: "user", content: text });
+  if (chat.title === "New chat") chat.title = text.slice(0, 40);
+  persist();
+  render();
   const assistantDiv = addBubble("assistant", "");
 
   try {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "luau-coder", messages, stream: true }),
+      body: JSON.stringify({ model: "luau-coder", messages: chat.messages, system: buildSystemPrompt(), stream: true }),
     });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -71,7 +239,8 @@ async function send() {
         assistantDiv.scrollIntoView();
       }
     }
-    messages.push({ role: "assistant", content: full });
+    chat.messages.push({ role: "assistant", content: full });
+    persist();
   } catch (e) {
     assistantDiv.textContent = "Error: " + e.message + "\n(Is `ollama serve` running?)";
   } finally {
@@ -80,8 +249,30 @@ async function send() {
   }
 }
 
-sendBtn.addEventListener("click", send);
-promptBox.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+document.getElementById("send").addEventListener("click", send);
+document.getElementById("prompt").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+document.getElementById("newChatBtn").addEventListener("click", newChat);
+
+const overlay = document.getElementById("settingsOverlay");
+document.getElementById("settingsBtn").addEventListener("click", () => {
+  document.getElementById("setEnthusiasm").value = settings.enthusiasm;
+  document.getElementById("setEmojis").value = settings.emojis;
+  document.getElementById("setSarcasm").value = settings.sarcasm;
+  overlay.classList.add("open");
+});
+document.getElementById("closeSettings").addEventListener("click", () => overlay.classList.remove("open"));
+for (const [key, id] of [["enthusiasm", "setEnthusiasm"], ["emojis", "setEmojis"], ["sarcasm", "setSarcasm"]]) {
+  document.getElementById(id).addEventListener("change", (e) => {
+    settings[key] = e.target.value;
+    saveSettings(settings);
+  });
+}
+
+if (!activeChatId || !getActiveChat()) {
+  if (chats.length) activeChatId = chats[0].id;
+  else newChat();
+}
+render();
 </script>
 </body>
 </html>
