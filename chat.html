@@ -18,6 +18,10 @@
   #newChatBtn:hover, #settingsBtn:hover { background: #333; }
   #settingsBtn { margin-top: auto; }
 
+  #greeting { padding: 8px 4px 4px; font-size: 14px; color: #ddd; }
+  #greeting .logout { display: block; margin-top: 2px; font-size: 12px; color: #888; cursor: pointer; }
+  #greeting .logout:hover { color: #ccc; text-decoration: underline; }
+
   #main { flex: 1; display: flex; flex-direction: column; max-width: 800px; margin: 0 auto; width: 100%; padding: 1.5rem; }
   #log { flex: 1; display: flex; flex-direction: column; gap: 12px; margin-bottom: 1rem; overflow-y: auto; }
   .msg { padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; max-width: 90%; }
@@ -37,11 +41,18 @@
   .setting-row select { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; }
   #settingsPanel .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
   #closeSettings { background: #444; }
+
+  #loginOverlay { display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 10; }
+  #loginOverlay.hidden { display: none; }
+  #loginPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 320px; text-align: center; }
+  #loginPanel h3 { margin-top: 0; }
+  #loginName { width: 100%; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin: 12px 0; text-align: center; }
 </style>
 </head>
 <body>
 
 <div id="sidebar">
+  <div id="greeting"></div>
   <button id="newChatBtn">+ New chat</button>
   <h3>Chats</h3>
   <div id="chatList"></div>
@@ -89,6 +100,14 @@
   </div>
 </div>
 
+<div id="loginOverlay" class="hidden">
+  <div id="loginPanel">
+    <h3>Who's coding?</h3>
+    <input id="loginName" placeholder="Your name" autofocus>
+    <button id="loginSubmit">Continue</button>
+  </div>
+</div>
+
 <script>
 const BASE_SYSTEM = "You are a Luau/Roblox coding assistant. Write correct, idiomatic Luau code for Roblox Studio. Prefer game:GetService(...) patterns, RemoteEvents/RemoteFunctions for client-server communication, and Roblox API conventions.";
 
@@ -127,6 +146,44 @@ function saveChats(chats) { localStorage.setItem("luau_chats", JSON.stringify(ch
 let settings = loadSettings();
 let chats = loadChats();
 let activeChatId = localStorage.getItem("luau_active_chat_id");
+
+// No backend here (static page hitting Ollama directly), so there's nothing to
+// authenticate against. This is a name tag + localStorage, not real auth.
+function loadUsername() { return localStorage.getItem("luau_username"); }
+function saveUsername(name) { localStorage.setItem("luau_username", name); }
+
+function renderGreeting() {
+  const name = loadUsername();
+  const el = document.getElementById("greeting");
+  el.innerHTML = "";
+  if (!name) return;
+  const line = document.createElement("div");
+  line.textContent = `What's up, ${name}`;
+  const logout = document.createElement("span");
+  logout.className = "logout";
+  logout.textContent = "Log out";
+  logout.addEventListener("click", () => {
+    localStorage.removeItem("luau_username");
+    showLogin();
+  });
+  el.appendChild(line);
+  el.appendChild(logout);
+}
+
+function showLogin() {
+  document.getElementById("loginOverlay").classList.remove("hidden");
+  document.getElementById("loginName").focus();
+}
+
+function submitLogin() {
+  const input = document.getElementById("loginName");
+  const name = input.value.trim();
+  if (!name) return;
+  saveUsername(name);
+  input.value = "";
+  document.getElementById("loginOverlay").classList.add("hidden");
+  renderGreeting();
+}
 
 function buildSystemPrompt() {
   return [BASE_SYSTEM, PERSONA.enthusiasm[settings.enthusiasm], PERSONA.emojis[settings.emojis], PERSONA.sarcasm[settings.sarcasm]].join(" ");
@@ -268,11 +325,16 @@ for (const [key, id] of [["enthusiasm", "setEnthusiasm"], ["emojis", "setEmojis"
   });
 }
 
+document.getElementById("loginSubmit").addEventListener("click", submitLogin);
+document.getElementById("loginName").addEventListener("keydown", (e) => { if (e.key === "Enter") submitLogin(); });
+
 if (!activeChatId || !getActiveChat()) {
   if (chats.length) activeChatId = chats[0].id;
   else newChat();
 }
 render();
+renderGreeting();
+if (!loadUsername()) showLogin();
 </script>
 </body>
 </html>
