@@ -154,11 +154,10 @@ function saveUsername(name) { localStorage.setItem("luau_username", name); }
 
 function renderGreeting() {
   const name = loadUsername();
+  document.getElementById("prompt").placeholder = name ? `What's up, ${name}` : "Ask for some Luau code...";
   const el = document.getElementById("greeting");
   el.innerHTML = "";
   if (!name) return;
-  const line = document.createElement("div");
-  line.textContent = `What's up, ${name}`;
   const logout = document.createElement("span");
   logout.className = "logout";
   logout.textContent = "Log out";
@@ -166,7 +165,6 @@ function renderGreeting() {
     localStorage.removeItem("luau_username");
     showLogin();
   });
-  el.appendChild(line);
   el.appendChild(logout);
 }
 
