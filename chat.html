@@ -44,7 +44,7 @@
   #settingsPanel h3 { margin-top: 0; }
   .setting-row { margin-bottom: 16px; }
   .setting-row label { display: block; margin-bottom: 6px; font-size: 13px; color: #aaa; }
-  .setting-row select { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; }
+  .setting-row select, .setting-row input { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; }
   #settingsPanel .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
   #closeSettings { background: #444; }
 
@@ -102,7 +102,11 @@
 
 <div id="settingsOverlay">
   <div id="settingsPanel">
-    <h3>How should it talk?</h3>
+    <h3>Settings</h3>
+    <div class="setting-row">
+      <label>Your name</label>
+      <input id="setDisplayName" placeholder="What should it call you?">
+    </div>
     <div class="setting-row">
       <label>Enthusiasm</label>
       <select id="setEnthusiasm">
@@ -208,7 +212,7 @@ const PERSONA = {
   },
 };
 
-const DEFAULT_SETTINGS = { enthusiasm: "low", emojis: "low", sarcasm: "low" };
+const DEFAULT_SETTINGS = { displayName: "", enthusiasm: "low", emojis: "low", sarcasm: "low" };
 
 // Real accounts via Supabase (free tier): email magic-link auth, and every
 // chat/agent/memory-fact/setting lives in Postgres behind row-level security
@@ -229,7 +233,13 @@ function rowToChat(row) {
 
 async function saveSettings(s) {
   settings = s;
-  await db.from("settings").upsert({ user_id: currentUser.id, ...s });
+  await db.from("settings").upsert({
+    user_id: currentUser.id,
+    display_name: s.displayName,
+    enthusiasm: s.enthusiasm,
+    emojis: s.emojis,
+    sarcasm: s.sarcasm,
+  });
 }
 
 async function loadAllData() {
@@ -242,15 +252,21 @@ async function loadAllData() {
   chats = (chatsRes.data || []).map(rowToChat);
   agents = (agentsRes.data || []).map((r) => ({ id: r.id, name: r.name, prompt: r.prompt }));
   memory = (memoryRes.data || []).map((r) => ({ id: r.id, fact: r.fact }));
-  settings = settingsRes.data ? { enthusiasm: settingsRes.data.enthusiasm, emojis: settingsRes.data.emojis, sarcasm: settingsRes.data.sarcasm } : { ...DEFAULT_SETTINGS };
+  settings = settingsRes.data
+    ? { displayName: settingsRes.data.display_name || "", enthusiasm: settingsRes.data.enthusiasm, emojis: settingsRes.data.emojis, sarcasm: settingsRes.data.sarcasm }
+    : { ...DEFAULT_SETTINGS };
 }
 
 function memoryFacts() {
   return memory.map((m) => m.fact);
 }
 
+function displayName() {
+  return settings.displayName || currentUser?.email || "";
+}
+
 function renderGreeting() {
-  document.getElementById("prompt").placeholder = currentUser ? `What's up, ${currentUser.email}` : "Ask for some Luau code...";
+  document.getElementById("prompt").placeholder = currentUser ? `What's up, ${displayName()}` : "Ask for some Luau code...";
   const el = document.getElementById("greeting");
   el.innerHTML = "";
   if (!currentUser) return;
@@ -480,7 +496,7 @@ function renderLog() {
   if (chat.messages.length === 0) {
     const greet = document.createElement("div");
     greet.id = "emptyGreeting";
-    greet.textContent = currentUser ? `What's up, ${currentUser.email}` : "What's up";
+    greet.textContent = currentUser ? `What's up, ${displayName()}` : "What's up";
     log.appendChild(greet);
     return;
   }
@@ -622,12 +638,19 @@ document.getElementById("newChatBtn").addEventListener("click", newChat);
 
 const overlay = document.getElementById("settingsOverlay");
 document.getElementById("settingsBtn").addEventListener("click", () => {
+  document.getElementById("setDisplayName").value = settings.displayName;
   document.getElementById("setEnthusiasm").value = settings.enthusiasm;
   document.getElementById("setEmojis").value = settings.emojis;
   document.getElementById("setSarcasm").value = settings.sarcasm;
   overlay.classList.add("open");
 });
 document.getElementById("closeSettings").addEventListener("click", () => overlay.classList.remove("open"));
+document.getElementById("setDisplayName").addEventListener("change", (e) => {
+  settings.displayName = e.target.value.trim();
+  saveSettings(settings);
+  renderGreeting();
+  renderLog();
+});
 for (const [key, id] of [["enthusiasm", "setEnthusiasm"], ["emojis", "setEmojis"], ["sarcasm", "setSarcasm"]]) {
   document.getElementById(id).addEventListener("change", (e) => {
     settings[key] = e.target.value;
