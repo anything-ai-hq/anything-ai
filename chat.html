@@ -67,6 +67,8 @@
     caret-color: #ddd;
   }
   #loginMessage { font-size: 13px; color: #888; margin-top: 8px; min-height: 1em; }
+  .secondary-btn { width: 100%; background: #444; }
+  .login-divider { color: #666; font-size: 12px; margin: 12px 0; }
 
   #ollamaOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; z-index: 20; }
   #ollamaOverlay.open { display: flex; }
@@ -175,6 +177,8 @@
 <div id="loginOverlay" class="hidden">
   <div id="loginPanel">
     <h3>Sign in</h3>
+    <button id="googleLogin" class="secondary-btn">Continue with Google</button>
+    <div class="login-divider">or</div>
     <input id="loginName" type="email" placeholder="you@example.com" autofocus>
     <button id="loginSubmit">Send magic link</button>
     <div id="loginMessage"></div>
@@ -735,6 +739,9 @@ checkOllama();
 
 document.getElementById("loginSubmit").addEventListener("click", submitLogin);
 document.getElementById("loginName").addEventListener("keydown", (e) => { if (e.key === "Enter") submitLogin(); });
+document.getElementById("googleLogin").addEventListener("click", () => {
+  db.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.href.split("#")[0] } });
+});
 
 document.getElementById("modelSelect").addEventListener("change", (e) => {
   currentModelId = e.target.value;
