@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>luau-coder chat</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; background: #1e1e1e; color: #ddd; }
+  #log { display: flex; flex-direction: column; gap: 12px; margin-bottom: 1rem; }
+  .msg { padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; }
+  .user { background: #2d5a9e; align-self: flex-end; }
+  .assistant { background: #333; align-self: flex-start; font-family: ui-monospace, monospace; }
+  #inputRow { display: flex; gap: 8px; }
+  #prompt { flex: 1; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; }
+  button { padding: 10px 18px; border: none; border-radius: 6px; background: #2d5a9e; color: white; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+</style>
+</head>
+<body>
+<h2>luau-coder</h2>
+<div id="log"></div>
+<div id="inputRow">
+  <input id="prompt" placeholder="Ask for some Luau code..." autofocus>
+  <button id="send">Send</button>
+</div>
+
+<script>
+const log = document.getElementById("log");
+const promptBox = document.getElementById("prompt");
+const sendBtn = document.getElementById("send");
+const messages = [];
+
+function addBubble(role, text) {
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  div.textContent = text;
+  log.appendChild(div);
+  div.scrollIntoView();
+  return div;
+}
+
+async function send() {
+  const text = promptBox.value.trim();
+  if (!text) return;
+  promptBox.value = "";
+  sendBtn.disabled = true;
+  messages.push({ role: "user", content: text });
+  addBubble("user", text);
+  const assistantDiv = addBubble("assistant", "");
+
+  try {
+    const res = await fetch("http://localhost:11434/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "luau-coder", messages, stream: true }),
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = "";
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const chunk = JSON.parse(line);
+        full += chunk.message?.content || "";
+        assistantDiv.textContent = full;
+        assistantDiv.scrollIntoView();
+      }
+    }
+    messages.push({ role: "assistant", content: full });
+  } catch (e) {
+    assistantDiv.textContent = "Error: " + e.message + "\n(Is `ollama serve` running?)";
+  } finally {
+    sendBtn.disabled = false;
+    promptBox.focus();
+  }
+}
+
+sendBtn.addEventListener("click", send);
+promptBox.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+</script>
+</body>
+</html>

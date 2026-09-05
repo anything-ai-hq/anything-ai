@@ -18,6 +18,13 @@ ollama create luau-coder -f models_gguf\Modelfile
 .venv\Scripts\python test_smoke.py
 ```
 
+## Web chat
+```
+ollama serve                      # if not already running
+.venv\Scripts\python -m http.server 8000
+```
+Open http://localhost:8000/chat.html — plain HTML/JS, talks straight to Ollama's API (CORS-allowed for localhost origins by default). No build step, no framework.
+
 ## Studio plugin
 Copy `studio_plugin/AICoder.lua` into `%LOCALAPPDATA%\Roblox\Plugins\`.
 In Studio: Game Settings > Security > enable "Allow HTTP Requests".
