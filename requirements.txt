@@ -1,0 +1,8 @@
+unsloth
+peft
+transformers
+bitsandbytes
+datasets
+trl
+huggingface_hub
+requests

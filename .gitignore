@@ -1,0 +1,10 @@
+.venv/
+outputs/
+models/
+models_gguf/
+adapters/
+data/
+scrape.log
+test_clone/
+__pycache__/
+unsloth_compiled_cache/
