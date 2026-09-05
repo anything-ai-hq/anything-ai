@@ -31,3 +31,6 @@ In Studio: Game Settings > Security > enable "Allow HTTP Requests".
 Keep `ollama serve` running, open the "Ask AI" dock widget from the toolbar.
 
 Side-panel ask-and-insert, not inline autocomplete (Studio plugin API doesn't expose that).
+
+## Agent Mode
+"Agents" in the web chat are saved personas only (name + system prompt) — no filesystem or command execution access. Pick one from the sidebar dropdown before starting a new chat, or add your own under "Agent Mode".

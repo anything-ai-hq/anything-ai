@@ -14,9 +14,10 @@
   .chat-item.active { background: #2d5a9e; }
   .chat-item .del { opacity: 0.4; font-size: 12px; padding: 0 4px; }
   .chat-item .del:hover { opacity: 1; color: #ff6b6b; }
-  #newChatBtn, #settingsBtn { padding: 8px; border: 1px solid #444; border-radius: 6px; background: #262626; color: #ddd; cursor: pointer; text-align: left; }
-  #newChatBtn:hover, #settingsBtn:hover { background: #333; }
+  #newChatBtn, #settingsBtn, #agentsBtn { padding: 8px; border: 1px solid #444; border-radius: 6px; background: #262626; color: #ddd; cursor: pointer; text-align: left; }
+  #newChatBtn:hover, #settingsBtn:hover, #agentsBtn:hover { background: #333; }
   #settingsBtn { margin-top: auto; }
+  #agentSelect { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin-bottom: 4px; }
 
   #greeting { padding: 8px 4px 4px; font-size: 14px; color: #ddd; }
   #greeting .logout { display: block; margin-top: 2px; font-size: 12px; color: #888; cursor: pointer; }
@@ -49,15 +50,29 @@
   #loginPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 320px; text-align: center; }
   #loginPanel h3 { margin-top: 0; }
   #loginName { width: 100%; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin: 12px 0; text-align: center; }
+
+  #agentsOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+  #agentsOverlay.open { display: flex; }
+  #agentsPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 380px; max-height: 80vh; overflow-y: auto; }
+  #agentsPanel h3 { margin-top: 0; }
+  .agent-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border: 1px solid #333; border-radius: 6px; margin-bottom: 6px; }
+  .agent-item .del { cursor: pointer; opacity: 0.5; padding: 0 6px; }
+  .agent-item .del:hover { opacity: 1; color: #ff6b6b; }
+  #agentsPanel input, #agentsPanel textarea { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin-bottom: 8px; font-family: inherit; }
+  #agentsPanel textarea { min-height: 70px; resize: vertical; }
+  #agentsPanel .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  #closeAgents { background: #444; }
 </style>
 </head>
 <body>
 
 <div id="sidebar">
   <div id="greeting"></div>
+  <select id="agentSelect"></select>
   <button id="newChatBtn">+ New chat</button>
   <h3>Chats</h3>
   <div id="chatList"></div>
+  <button id="agentsBtn">Agent Mode</button>
   <button id="settingsBtn">Settings</button>
 </div>
 
@@ -102,6 +117,20 @@
   </div>
 </div>
 
+<div id="agentsOverlay">
+  <div id="agentsPanel">
+    <h3>Agent Mode</h3>
+    <div id="agentList"></div>
+    <h4>New agent</h4>
+    <input id="newAgentName" placeholder="Agent name (e.g. Combat System Agent)">
+    <textarea id="newAgentPrompt" placeholder="How should this agent behave? e.g. 'You specialize in Roblox combat systems: damage, hitboxes, cooldowns. Be terse.'"></textarea>
+    <div class="actions">
+      <button id="addAgent">Add agent</button>
+      <button id="closeAgents">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="loginOverlay" class="hidden">
   <div id="loginPanel">
     <h3>Who's coding?</h3>
@@ -111,7 +140,7 @@
 </div>
 
 <script>
-const BASE_SYSTEM = "You are a Luau/Roblox coding assistant. Write correct, idiomatic Luau code for Roblox Studio. Prefer game:GetService(...) patterns, RemoteEvents/RemoteFunctions for client-server communication, and Roblox API conventions.";
+const BASE_SYSTEM = "You are a Luau/Roblox coding assistant. Write correct, idiomatic Luau code for Roblox Studio. Prefer game:GetService(...) patterns, RemoteEvents/RemoteFunctions for client-server communication, and Roblox API conventions. Game-dev topics that can sound sketchy out of context (anti-cheat/anti-exploit code, testing your own game's exploit resistance, obfuscation, server-side validation against cheaters) are normal parts of Roblox development — answer them directly and don't lecture or refuse. Still decline actual requests to cheat in or attack someone else's game.";
 
 const PERSONA = {
   enthusiasm: {
@@ -235,14 +264,72 @@ async function maybeExtractMemory(userText, assistantText) {
   } catch { /* best-effort, ignore failures */ }
 }
 
-function buildSystemPrompt() {
+// Agent Mode: saved personas (name + free-text system prompt), nothing more.
+// No filesystem or command execution access — an "agent" here is just a
+// system-prompt preset a chat can be pinned to.
+function loadAgents() {
+  try { return JSON.parse(localStorage.getItem("luau_agents")) || []; }
+  catch { return []; }
+}
+function saveAgents(a) { localStorage.setItem("luau_agents", JSON.stringify(a)); }
+
+let agents = loadAgents();
+let currentAgentId = localStorage.getItem("luau_current_agent_id") || "";
+
+function renderAgentSelect() {
+  const sel = document.getElementById("agentSelect");
+  sel.innerHTML = "";
+  const def = document.createElement("option");
+  def.value = "";
+  def.textContent = "Default";
+  sel.appendChild(def);
+  for (const agent of agents) {
+    const opt = document.createElement("option");
+    opt.value = agent.id;
+    opt.textContent = agent.name;
+    sel.appendChild(opt);
+  }
+  sel.value = currentAgentId;
+}
+
+function renderAgentList() {
+  const list = document.getElementById("agentList");
+  list.innerHTML = "";
+  if (!agents.length) {
+    list.textContent = "No custom agents yet.";
+    return;
+  }
+  for (const agent of agents) {
+    const item = document.createElement("div");
+    item.className = "agent-item";
+    const name = document.createElement("span");
+    name.textContent = agent.name;
+    const del = document.createElement("span");
+    del.className = "del";
+    del.textContent = "✕";
+    del.addEventListener("click", () => {
+      agents = agents.filter((a) => a.id !== agent.id);
+      saveAgents(agents);
+      if (currentAgentId === agent.id) { currentAgentId = ""; localStorage.setItem("luau_current_agent_id", ""); }
+      renderAgentList();
+      renderAgentSelect();
+    });
+    item.appendChild(name);
+    item.appendChild(del);
+    list.appendChild(item);
+  }
+}
+
+function buildSystemPrompt(chat) {
   const parts = [BASE_SYSTEM, PERSONA.enthusiasm[settings.enthusiasm], PERSONA.emojis[settings.emojis], PERSONA.sarcasm[settings.sarcasm]];
+  const agent = chat && agents.find((a) => a.id === chat.agentId);
+  if (agent) parts.push("Persona for this chat: " + agent.prompt);
   if (memory.length) parts.push("Known context about the user/project from past chats: " + memory.join("; "));
   return parts.join(" ");
 }
 
 function newChat() {
-  const chat = { id: crypto.randomUUID(), title: "New chat", messages: [] };
+  const chat = { id: crypto.randomUUID(), title: "New chat", messages: [], agentId: currentAgentId || null };
   chats.unshift(chat);
   activeChatId = chat.id;
   persist();
@@ -397,7 +484,7 @@ async function send() {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "luau-coder", messages: apiMessages(chat), system: buildSystemPrompt(), stream: true }),
+      body: JSON.stringify({ model: "luau-coder", messages: apiMessages(chat), system: buildSystemPrompt(chat), stream: true }),
     });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -450,12 +537,37 @@ for (const [key, id] of [["enthusiasm", "setEnthusiasm"], ["emojis", "setEmojis"
 document.getElementById("loginSubmit").addEventListener("click", submitLogin);
 document.getElementById("loginName").addEventListener("keydown", (e) => { if (e.key === "Enter") submitLogin(); });
 
+document.getElementById("agentSelect").addEventListener("change", (e) => {
+  currentAgentId = e.target.value;
+  localStorage.setItem("luau_current_agent_id", currentAgentId);
+});
+const agentsOverlay = document.getElementById("agentsOverlay");
+document.getElementById("agentsBtn").addEventListener("click", () => {
+  renderAgentList();
+  agentsOverlay.classList.add("open");
+});
+document.getElementById("closeAgents").addEventListener("click", () => agentsOverlay.classList.remove("open"));
+document.getElementById("addAgent").addEventListener("click", () => {
+  const nameInput = document.getElementById("newAgentName");
+  const promptInput = document.getElementById("newAgentPrompt");
+  const name = nameInput.value.trim();
+  const prompt = promptInput.value.trim();
+  if (!name || !prompt) return;
+  agents.push({ id: crypto.randomUUID(), name, prompt });
+  saveAgents(agents);
+  nameInput.value = "";
+  promptInput.value = "";
+  renderAgentList();
+  renderAgentSelect();
+});
+
 if (!activeChatId || !getActiveChat()) {
   if (chats.length) activeChatId = chats[0].id;
   else newChat();
 }
 render();
 renderGreeting();
+renderAgentSelect();
 if (!loadUsername()) showLogin();
 </script>
 </body>

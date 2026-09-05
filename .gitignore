@@ -1,7 +1,8 @@
 .venv/
 outputs/
 models/
-models_gguf/
+models_gguf/*
+!models_gguf/Modelfile
 adapters/
 data/
 scrape.log
