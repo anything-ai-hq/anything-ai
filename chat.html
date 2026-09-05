@@ -28,6 +28,7 @@
   .msg { padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; max-width: 90%; }
   .user { background: #2d5a9e; align-self: flex-end; }
   .assistant { background: #333; align-self: flex-start; font-family: ui-monospace, monospace; }
+  .info { background: transparent; border: 1px dashed #444; color: #999; align-self: center; font-size: 13px; font-family: ui-monospace, monospace; max-width: 100%; }
   #inputRow { display: flex; gap: 8px; }
   #prompt { flex: 1; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; }
   button { padding: 10px 18px; border: none; border-radius: 6px; background: #2d5a9e; color: white; cursor: pointer; }
@@ -185,8 +186,59 @@ function submitLogin() {
   renderLog();
 }
 
+// Cross-chat memory: a flat list of short facts, shared across all chats via
+// localStorage, injected into every request's system prompt. Extraction uses
+// the same small model, so quality is rough — good enough for a prototype.
+const MAX_MEMORY_FACTS = 40;
+
+function loadMemory() {
+  try { return JSON.parse(localStorage.getItem("luau_memory")) || []; }
+  catch { return []; }
+}
+function saveMemory(facts) { localStorage.setItem("luau_memory", JSON.stringify(facts)); }
+
+let memory = loadMemory();
+
+function addMemoryFact(fact) {
+  fact = fact.trim();
+  if (!fact) return false;
+  if (memory.some((f) => f.toLowerCase() === fact.toLowerCase())) return false;
+  memory.push(fact);
+  if (memory.length > MAX_MEMORY_FACTS) memory.shift();
+  saveMemory(memory);
+  return true;
+}
+
+function forgetMemory(keyword) {
+  const before = memory.length;
+  if (keyword.toLowerCase() === "all") memory = [];
+  else memory = memory.filter((f) => !f.toLowerCase().includes(keyword.toLowerCase()));
+  saveMemory(memory);
+  return before - memory.length;
+}
+
+async function maybeExtractMemory(userText, assistantText) {
+  try {
+    const res = await fetch("http://localhost:11434/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "luau-coder",
+        stream: false,
+        system: "Extract at most one short durable fact about the user or their project (preferences, project name, tech choices) from this exchange, worth remembering in future unrelated conversations. Reply with just the fact in a few words, nothing else. If there's nothing durable, reply with exactly: NONE",
+        messages: [{ role: "user", content: `User: ${userText}\nAssistant: ${assistantText}` }],
+      }),
+    });
+    const data = await res.json();
+    const fact = (data.message?.content || "").trim();
+    if (fact && fact.toUpperCase() !== "NONE" && fact.length < 200) addMemoryFact(fact);
+  } catch { /* best-effort, ignore failures */ }
+}
+
 function buildSystemPrompt() {
-  return [BASE_SYSTEM, PERSONA.enthusiasm[settings.enthusiasm], PERSONA.emojis[settings.emojis], PERSONA.sarcasm[settings.sarcasm]].join(" ");
+  const parts = [BASE_SYSTEM, PERSONA.enthusiasm[settings.enthusiasm], PERSONA.emojis[settings.emojis], PERSONA.sarcasm[settings.sarcasm]];
+  if (memory.length) parts.push("Known context about the user/project from past chats: " + memory.join("; "));
+  return parts.join(" ");
 }
 
 function newChat() {
@@ -254,6 +306,44 @@ function render() {
   renderLog();
 }
 
+// Plugins = slash commands. Two kinds: LOCAL_COMMANDS run entirely client-side
+// (no model call, result shown as an "info" bubble); EXPAND_COMMANDS rewrite
+// the typed text into a fuller prompt and then send normally.
+const LOCAL_COMMANDS = {
+  help: {
+    desc: "/help - list commands",
+    run: () => Object.values(LOCAL_COMMANDS).map((c) => c.desc).concat(Object.values(EXPAND_COMMANDS).map((c) => c.desc)).join("\n"),
+  },
+  memory: {
+    desc: "/memory - show what's remembered across chats",
+    run: () => (memory.length ? memory.map((f) => "- " + f).join("\n") : "Nothing remembered yet."),
+  },
+  remember: {
+    desc: "/remember <fact> - save a fact across all chats",
+    run: (args) => {
+      if (!args) return "Usage: /remember <fact>";
+      return addMemoryFact(args) ? `Remembered: ${args}` : "Already remembered.";
+    },
+  },
+  forget: {
+    desc: "/forget <keyword|all> - remove remembered fact(s)",
+    run: (args) => {
+      if (!args) return "Usage: /forget <keyword|all>";
+      const n = forgetMemory(args);
+      return n > 0 ? `Forgot ${n} fact(s).` : "No matching facts.";
+    },
+  },
+};
+
+const EXPAND_COMMANDS = {
+  explain: { desc: "/explain <code> - explain what code does", expand: (args) => `Explain what this Luau code does, step by step:\n${args}` },
+  fix: { desc: "/fix <code> - find and fix bugs", expand: (args) => `Find and fix bugs in this Luau code, and explain the fix:\n${args}` },
+};
+
+function apiMessages(chat) {
+  return chat.messages.filter((m) => m.role === "user" || m.role === "assistant");
+}
+
 function addBubble(role, text) {
   const div = document.createElement("div");
   div.className = "msg " + role;
@@ -266,16 +356,39 @@ function addBubble(role, text) {
 async function send() {
   const promptBox = document.getElementById("prompt");
   const sendBtn = document.getElementById("send");
-  const text = promptBox.value.trim();
-  if (!text) return;
+  const raw = promptBox.value.trim();
+  if (!raw) return;
 
   let chat = getActiveChat();
   if (!chat) { newChat(); chat = getActiveChat(); }
 
+  let text = raw;
+  if (raw.startsWith("/")) {
+    const spaceIdx = raw.indexOf(" ");
+    const cmd = (spaceIdx === -1 ? raw.slice(1) : raw.slice(1, spaceIdx)).toLowerCase();
+    const args = spaceIdx === -1 ? "" : raw.slice(spaceIdx + 1).trim();
+    if (LOCAL_COMMANDS[cmd]) {
+      promptBox.value = "";
+      chat.messages.push({ role: "info", content: LOCAL_COMMANDS[cmd].run(args) });
+      persist();
+      render();
+      return;
+    }
+    if (EXPAND_COMMANDS[cmd]) {
+      text = EXPAND_COMMANDS[cmd].expand(args);
+    } else {
+      promptBox.value = "";
+      chat.messages.push({ role: "info", content: `Unknown command: /${cmd}. Try /help.` });
+      persist();
+      render();
+      return;
+    }
+  }
+
   promptBox.value = "";
   sendBtn.disabled = true;
   chat.messages.push({ role: "user", content: text });
-  if (chat.title === "New chat") chat.title = text.slice(0, 40);
+  if (chat.title === "New chat") chat.title = raw.slice(0, 40);
   persist();
   render();
   const assistantDiv = addBubble("assistant", "");
@@ -284,7 +397,7 @@ async function send() {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "luau-coder", messages: chat.messages, system: buildSystemPrompt(), stream: true }),
+      body: JSON.stringify({ model: "luau-coder", messages: apiMessages(chat), system: buildSystemPrompt(), stream: true }),
     });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -306,6 +419,7 @@ async function send() {
     }
     chat.messages.push({ role: "assistant", content: full });
     persist();
+    maybeExtractMemory(text, full);
   } catch (e) {
     assistantDiv.textContent = "Error: " + e.message + "\n(Is `ollama serve` running?)";
   } finally {
