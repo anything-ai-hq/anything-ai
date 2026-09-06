@@ -139,7 +139,7 @@
   <button id="menuToggle">&#9776;</button>
   <div id="log"></div>
   <div id="inputRow">
-    <input id="prompt" placeholder="Ask for some Luau code..." autofocus>
+    <input id="prompt" placeholder="Ask for some Luau code...">
     <select id="modelSelect" class="pill"></select>
     <select id="effortSelect" class="pill"></select>
     <button id="send">Send</button>
@@ -209,7 +209,7 @@
 <div id="loginOverlay" class="hidden">
   <div id="loginPanel">
     <h3>Sign in</h3>
-    <input id="loginName" type="email" placeholder="you@example.com" autofocus>
+    <input id="loginName" type="email" placeholder="you@example.com">
     <button id="loginSubmit">Send magic link</button>
     <div id="loginMessage"></div>
   </div>
@@ -791,7 +791,7 @@ async function send() {
   }
   currentAbortController = null;
   setGenerating(false);
-  promptBox.focus();
+  if (!mobileMedia.matches) promptBox.focus();
 }
 
 document.getElementById("send").addEventListener("click", send);
