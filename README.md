@@ -1,6 +1,6 @@
 # Anything.ai
 
-Three local models behind one web chat: **Koda** is a Luau/Roblox coder (LoRA fine-tuned from Qwen2.5-Coder-1.5B-Instruct), **Soi** is an everyday assistant (same base, general-purpose system prompt), both served via Ollama. **Vela** is local image generation (SD-Turbo via `diffusers`, served by `vela_server.py`) — currently a one-shot demo in a "meet Vela" popup, full chat integration coming later. Pipeline: scrape -> LoRA fine-tune -> GGUF -> Ollama -> web chat / Studio plugin.
+Three local models behind one web chat: **Koda** is a Luau/Roblox coder (LoRA fine-tuned from Qwen2.5-Coder-1.5B-Instruct), **Soi** is an everyday assistant (same base, general-purpose system prompt), both served via Ollama. **Vela** is local image generation (SD-Turbo via `diffusers`, served by `vela_server.py`) — a real model in the chat's model dropdown for subscribed/admin/granted accounts (everyone else gets a one-shot "meet Vela" popup demo). Pipeline: scrape -> LoRA fine-tune -> GGUF -> Ollama -> web chat / Studio plugin.
 
 ## Setup
 ```
@@ -81,7 +81,9 @@ Koda/Soi are text-only (Qwen2.5-Coder has no vision tower), so attaching a scree
 ```
 .venv\Scripts\python vela_server.py
 ```
-Serves on `http://localhost:7860`, first run downloads SD-Turbo (~5-6GB). The "Meet Vela" popup (shows once per browser via a localStorage flag) has a live one-shot generation demo that calls this server directly — same CORS-from-any-origin approach as Ollama, so it works from the deployed site too, as long as `vela_server.py` is running on your machine. No Ollama involvement; Ollama doesn't serve image models.
+Serves on `http://localhost:7860`, first run downloads SD-Turbo (~5-6GB). Accounts with access (dev / subscribed / granted `vela` in the admin editor) get Vela as a real model in the chat dropdown — quota-checked server-side via the `use_image_generation` Postgres function (20/day, unlimited for dev). Everyone else gets a one-shot generation demo in the "Meet Vela" popup instead. Same CORS-from-any-origin approach as Ollama, so it works from the deployed site too, as long as `vela_server.py` is running on your machine. No Ollama involvement; Ollama doesn't serve image models.
+
+Generated images are **not persisted to Supabase** — only a text placeholder ("🎨 [Vela image — not saved, refresh loses it]") survives a reload, matching the vision-attachment decision (base64 image bytes would bloat every chat row). The image itself is visible for the current session only.
 
 ## Studio plugin
 Copy `studio_plugin/AICoder.lua` into `%LOCALAPPDATA%\Roblox\Plugins\`.
