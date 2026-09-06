@@ -74,13 +74,25 @@
   .chat-item:hover .del { opacity: 0.6; }
   .chat-item .del:hover { opacity: 1 !important; color: var(--danger); }
 
-  #newChatBtn, #settingsBtn, #agentsBtn, #instructionsBtn {
-    padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised);
-    color: var(--chrome-hi); cursor: pointer; text-align: left; display: block; text-decoration: none;
-    box-sizing: border-box; font-size: 13.5px; font-family: var(--font-body); transition: border-color 0.15s, background 0.15s;
+  /* New chat is the one primary sidebar action - full accent treatment. */
+  #newChatBtn {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 11px; border-radius: 10px; background: var(--accent); color: #fff;
+    font-size: 13.5px; font-family: var(--font-body); font-weight: 500; cursor: pointer; border: none;
   }
-  #newChatBtn:hover, #settingsBtn:hover, #agentsBtn:hover, #instructionsBtn:hover { background: var(--surface-hover); border-color: var(--chrome-dim); }
-  #instructionsBtn { margin-top: auto; color: var(--chrome-mid); }
+  #newChatBtn .icon { font-size: 15px; line-height: 1; }
+
+  /* Everything else is a secondary utility, grouped into one icon row instead
+     of three identical stacked bars competing for attention. */
+  #utilityRow { margin-top: auto; display: flex; gap: 6px; }
+  .utility-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 4px 9px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised);
+    color: var(--chrome-mid); cursor: pointer; text-decoration: none; font-size: 10.5px; font-family: var(--font-body);
+    transition: background 0.15s, color 0.15s, transform 0.15s, border-color 0.15s;
+  }
+  .utility-btn .icon { font-size: 16px; line-height: 1; }
+  .utility-btn:hover { background: var(--surface-hover); color: var(--chrome-hi); border-color: var(--chrome-dim); transform: translateY(-2px); }
 
   #sidebarModelControls { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
   #sidebarModelControls .dropdown-trigger { width: 100%; border-radius: 8px; }
@@ -262,12 +274,14 @@
   <div class="dropdown" id="agentSelectWrap">
     <select id="agentSelect"></select>
   </div>
-  <button id="newChatBtn">+ New chat</button>
+  <button id="newChatBtn"><span class="icon">＋</span> New chat</button>
   <h3>Chats</h3>
   <div id="chatList"></div>
-  <button id="agentsBtn">Agent Mode</button>
-  <button id="settingsBtn">Settings</button>
-  <a id="instructionsBtn" href="instructions.html" target="_blank" rel="noopener">Instructions</a>
+  <div id="utilityRow">
+    <button id="agentsBtn" class="utility-btn"><span class="icon">🎭</span>Agents</button>
+    <button id="settingsBtn" class="utility-btn"><span class="icon">⚙</span>Settings</button>
+    <a id="instructionsBtn" class="utility-btn" href="instructions.html" target="_blank" rel="noopener"><span class="icon">？</span>Help</a>
+  </div>
 </div>
 <div id="sidebarBackdrop"></div>
 
@@ -282,8 +296,8 @@
     <div class="dropdown" id="effortSelectWrap">
       <select id="effortSelect"></select>
     </div>
-    <button id="send">Send</button>
-    <button id="stopBtn" style="display:none">Stop</button>
+    <button id="send">Send ➤</button>
+    <button id="stopBtn" style="display:none">◼ Stop</button>
   </div>
 </div>
 
