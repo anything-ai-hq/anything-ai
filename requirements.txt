@@ -6,3 +6,6 @@ datasets
 trl
 huggingface_hub
 requests
+numpy
+diffusers
+accelerate
