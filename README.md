@@ -42,7 +42,7 @@ Accounts + data (chats, agents, memory, settings) are backed by Supabase (free t
 
 ## Live site
 
-Hosted free on GitHub Pages: **https://jackcahill1403-dot.github.io/anything-ai/**
+Hosted free on GitHub Pages: **https://anything-ai-hq.github.io/anything-ai/**
 
 To publish an update:
 ```
@@ -52,7 +52,7 @@ git push github-pages master
 ```
 Pages rebuilds automatically in under a minute, no separate deploy command needed. (We started on Netlify but its team account hit an undocumented billing block on new deploys — GitHub Pages has no such credit system and just works off a plain push.)
 
-Any browser hitting this page needs its own local Ollama, with `OLLAMA_ORIGINS` including `https://jackcahill1403-dot.github.io` (see the in-app "Instructions" page for the exact fix).
+Any browser hitting this page needs its own local Ollama, with `OLLAMA_ORIGINS` including `https://anything-ai-hq.github.io` (see the in-app "Instructions" page for the exact fix).
 
 ## Studio plugin
 Copy `studio_plugin/AICoder.lua` into `%LOCALAPPDATA%\Roblox\Plugins\`.
