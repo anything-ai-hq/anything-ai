@@ -1263,12 +1263,26 @@ document.getElementById("closeVela").addEventListener("click", closeVelaPopup);
 document.getElementById("velaPrompt").addEventListener("keydown", (e) => { if (e.key === "Enter") generateVela(); });
 document.getElementById("velaGenerate").addEventListener("click", generateVela);
 
+// The demo is one free generation, not unlimited access - a hint, not the
+// product. Errors (e.g. server not running) don't burn the one shot.
+function lockVelaDemo(message) {
+  document.getElementById("velaPrompt").disabled = true;
+  document.getElementById("velaGenerate").disabled = true;
+  document.getElementById("velaResult").insertAdjacentHTML(
+    "beforeend",
+    `<div class="vela-status">${message}</div>`
+  );
+}
+if (localStorage.getItem("vela_demo_used")) {
+  lockVelaDemo("You've used your early hint — full Vela access is coming soon.");
+}
+
 async function generateVela() {
   const promptBox = document.getElementById("velaPrompt");
   const genBtn = document.getElementById("velaGenerate");
   const result = document.getElementById("velaResult");
   const prompt = promptBox.value.trim();
-  if (!prompt) return;
+  if (!prompt || localStorage.getItem("vela_demo_used")) return;
   genBtn.disabled = true;
   result.innerHTML = '<div class="vela-status">Generating...</div>';
   try {
@@ -1283,12 +1297,14 @@ async function generateVela() {
       const img = document.createElement("img");
       img.src = data.image;
       result.appendChild(img);
+      localStorage.setItem("vela_demo_used", "true");
+      lockVelaDemo("That's your one early hint — full Vela access is coming soon.");
     } else {
       result.innerHTML = `<div class="vela-status">${data.error || "Something went wrong."}</div>`;
+      genBtn.disabled = false;
     }
   } catch {
     result.innerHTML = '<div class="vela-status">Can\'t reach Vela right now - make sure vela_server.py is running.</div>';
-  } finally {
     genBtn.disabled = false;
   }
 }
