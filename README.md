@@ -1,6 +1,6 @@
 # Anything.ai
 
-Two local Ollama models behind one web chat: **Koda** is a Luau/Roblox coder (LoRA fine-tuned from Qwen2.5-Coder-1.5B-Instruct), **Soi** is an everyday assistant (same base, general-purpose system prompt). Pipeline: scrape -> LoRA fine-tune -> GGUF -> Ollama -> web chat / Studio plugin.
+Three local models behind one web chat: **Koda** is a Luau/Roblox coder (LoRA fine-tuned from Qwen2.5-Coder-1.5B-Instruct), **Soi** is an everyday assistant (same base, general-purpose system prompt), both served via Ollama. **Vela** is local image generation (SD-Turbo via `diffusers`, served by `vela_server.py`) — currently a one-shot demo in a "meet Vela" popup, full chat integration coming later. Pipeline: scrape -> LoRA fine-tune -> GGUF -> Ollama -> web chat / Studio plugin.
 
 ## Setup
 ```
@@ -53,6 +53,12 @@ git push github-pages master
 Pages rebuilds automatically in under a minute, no separate deploy command needed. (We started on Netlify but its team account hit an undocumented billing block on new deploys — GitHub Pages has no such credit system and just works off a plain push.)
 
 Any browser hitting this page needs its own local Ollama, with `OLLAMA_ORIGINS` including `https://anything-ai-hq.github.io` (see the in-app "Instructions" page for the exact fix).
+
+## Vela (image generation)
+```
+.venv\Scripts\python vela_server.py
+```
+Serves on `http://localhost:7860`, first run downloads SD-Turbo (~5-6GB). The "Meet Vela" popup (shows once per browser via a localStorage flag) has a live one-shot generation demo that calls this server directly — same CORS-from-any-origin approach as Ollama, so it works from the deployed site too, as long as `vela_server.py` is running on your machine. No Ollama involvement; Ollama doesn't serve image models.
 
 ## Studio plugin
 Copy `studio_plugin/AICoder.lua` into `%LOCALAPPDATA%\Roblox\Plugins\`.

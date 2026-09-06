@@ -238,7 +238,7 @@
   #stopBtn:hover { background: #8f7875; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
 
   /* ---------- Overlays ---------- */
-  #settingsOverlay, #agentsOverlay, #ollamaOverlay, #loginOverlay {
+  #settingsOverlay, #agentsOverlay, #ollamaOverlay, #loginOverlay, #velaOverlay {
     position: fixed; inset: 0; align-items: center; justify-content: center;
     background: rgba(6,6,7,0.7); backdrop-filter: blur(6px);
   }
@@ -253,6 +253,9 @@
     background: linear-gradient(rgba(6,6,7,0.55), rgba(6,6,7,0.75)), url('assets/login-bg.jpg') center/cover;
   }
   #loginOverlay.hidden { display: none; }
+  #velaOverlay { display: none; z-index: 40; }
+  #velaOverlay.open { display: flex; }
+  #velaOverlay.hidden { display: none; }
 
   #settingsPanel, #agentsPanel, #ollamaPanel, #loginPanel {
     background: linear-gradient(160deg, rgba(40,40,45,0.55), rgba(20,20,23,0.7));
@@ -268,6 +271,29 @@
     content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
     background: linear-gradient(90deg, transparent, var(--chrome-mid), transparent);
   }
+
+  #velaPanel {
+    background: linear-gradient(160deg, rgba(40,40,45,0.55), rgba(20,20,23,0.7));
+    backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    width: 480px; max-width: 92vw; max-height: 88vh; overflow-y: auto;
+    animation: panel-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) { #velaPanel { animation: none; } }
+  #velaBanner { width: 100%; display: block; height: 130px; object-fit: cover; }
+  #velaBody { padding: 22px 26px 26px; }
+  #velaIntro { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
+  #velaAvatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  #velaIntro h3 { font-family: var(--font-display); font-weight: 600; margin: 0 0 6px; }
+  #velaIntro p { font-size: 13.5px; color: var(--chrome-mid); margin: 0; line-height: 1.5; }
+  #velaDemo { display: flex; gap: 8px; margin-bottom: 12px; }
+  #velaDemo input { flex: 1; padding: 10px; background: var(--surface); color: var(--chrome-hi); border: 1px solid var(--border); border-radius: 8px; }
+  #velaResult { min-height: 0; }
+  #velaResult img { width: 100%; border-radius: 10px; display: block; }
+  #velaResult .vela-status { font-size: 13px; color: var(--chrome-dim); text-align: center; padding: 10px 0; }
+  #closeVela { background: var(--surface-hover); color: var(--chrome-hi); }
+  #closeVela:hover { background: var(--border); }
   #settingsPanel h3, #agentsPanel h3, #ollamaPanel h3, #loginPanel h3 { margin-top: 0; font-family: var(--font-display); font-weight: 600; }
   #settingsPanel { width: 340px; }
   #loginPanel { width: 320px; text-align: center; }
@@ -413,6 +439,29 @@
     <input id="loginName" type="email" placeholder="you@example.com">
     <button id="loginSubmit">Send magic link</button>
     <div id="loginMessage"></div>
+  </div>
+</div>
+
+<div id="velaOverlay">
+  <div id="velaPanel">
+    <img id="velaBanner" src="assets/vela-banner.jpg" alt="">
+    <div id="velaBody">
+      <div id="velaIntro">
+        <img id="velaAvatar" src="assets/vela-avatar.png" alt="">
+        <div>
+          <h3>Meet Vela</h3>
+          <p>Our third model — local image generation, running the same way Koda and Soi do. Full chat integration is coming soon. Here's an early hint: try it right now.</p>
+        </div>
+      </div>
+      <div id="velaDemo">
+        <input id="velaPrompt" placeholder="Describe an image...">
+        <button id="velaGenerate">Generate</button>
+      </div>
+      <div id="velaResult"></div>
+      <div class="actions">
+        <button id="closeVela">Got it</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1197,6 +1246,52 @@ initDropdown("modelSelect");
 initDropdown("effortSelect");
 initDropdown("agentSelect");
 placeModelEffortControls();
+
+// Vela teaser popup: shows once per browser (not once per account - this is
+// a localStorage flag, not tied to sign-in), with a real live-generation
+// demo hitting the local Vela server as the "hint" rather than a static
+// coming-soon image.
+const VELA_URL = "http://localhost:7860/generate";
+if (!localStorage.getItem("vela_popup_seen")) {
+  document.getElementById("velaOverlay").classList.add("open");
+}
+function closeVelaPopup() {
+  localStorage.setItem("vela_popup_seen", "true");
+  document.getElementById("velaOverlay").classList.remove("open");
+}
+document.getElementById("closeVela").addEventListener("click", closeVelaPopup);
+document.getElementById("velaPrompt").addEventListener("keydown", (e) => { if (e.key === "Enter") generateVela(); });
+document.getElementById("velaGenerate").addEventListener("click", generateVela);
+
+async function generateVela() {
+  const promptBox = document.getElementById("velaPrompt");
+  const genBtn = document.getElementById("velaGenerate");
+  const result = document.getElementById("velaResult");
+  const prompt = promptBox.value.trim();
+  if (!prompt) return;
+  genBtn.disabled = true;
+  result.innerHTML = '<div class="vela-status">Generating...</div>';
+  try {
+    const res = await fetch(VELA_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await res.json();
+    if (data.image) {
+      result.innerHTML = "";
+      const img = document.createElement("img");
+      img.src = data.image;
+      result.appendChild(img);
+    } else {
+      result.innerHTML = `<div class="vela-status">${data.error || "Something went wrong."}</div>`;
+    }
+  } catch {
+    result.innerHTML = '<div class="vela-status">Can\'t reach Vela right now - make sure vela_server.py is running.</div>';
+  } finally {
+    genBtn.disabled = false;
+  }
+}
 
 document.getElementById("loginSubmit").addEventListener("click", submitLogin);
 document.getElementById("loginName").addEventListener("keydown", (e) => { if (e.key === "Enter") submitLogin(); });
