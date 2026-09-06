@@ -214,11 +214,22 @@
     background: linear-gradient(160deg, rgba(45,45,50,0.55), rgba(22,22,25,0.65));
     backdrop-filter: blur(20px) saturate(150%);
     -webkit-backdrop-filter: blur(20px) saturate(150%);
-    border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 6px 6px 6px 18px;
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 6px;
     box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
   }
   #inputRow:focus-within { border-color: var(--chrome-dim); }
   #prompt { flex: 1; padding: 10px 4px; background: transparent; color: var(--chrome-hi); border: none; outline: none; min-width: 0; }
+  #attachBtn {
+    background: transparent; padding: 8px 10px; font-size: 15px; flex-shrink: 0;
+    box-shadow: none;
+  }
+  #attachBtn:hover { background: var(--surface-hover); transform: none; box-shadow: none; }
+  #attachBtn::before { display: none; }
+  #attachmentPreview { display: none; align-items: center; gap: 8px; margin-bottom: 8px; padding: 6px 10px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 10px; font-size: 12.5px; color: var(--chrome-mid); }
+  #attachmentPreview.show { display: flex; }
+  #attachmentPreview img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
+  #attachmentPreview .remove-attachment { margin-left: auto; cursor: pointer; color: var(--chrome-dim); padding: 0 4px; }
+  #attachmentPreview .remove-attachment:hover { color: var(--danger); }
   #prompt::placeholder { color: var(--chrome-dim); }
   #prompt:disabled { opacity: 0.5; }
   button {
@@ -359,7 +370,10 @@
 <div id="main">
   <button id="menuToggle">&#9776;</button>
   <div id="log"></div>
+  <div id="attachmentPreview"></div>
   <div id="inputRow">
+    <button id="attachBtn" type="button" title="Attach a screenshot or video">📎</button>
+    <input id="fileInput" type="file" accept="image/*,video/*" style="display:none">
     <input id="prompt" placeholder="Ask for some Luau code...">
     <div class="dropdown" id="modelSelectWrap">
       <select id="modelSelect"></select>
@@ -1055,13 +1069,129 @@ function addThinkingBubble(avatarSrc) {
   return content;
 }
 
+// Vision: Koda/Soi are text-only (no vision tower on Qwen2.5-Coder), so
+// screenshot/video understanding routes to moondream instead - a real,
+// separate small vision model, not a capability of the coding/chat models.
+// "Watching a video" here means sampling a handful of frames client-side
+// (HTML5 video + canvas, no server-side ffmpeg needed) and describing them
+// as a set of images - a summary of sampled frames, not continuous video
+// understanding, which no locally-runnable model actually does.
+const VISION_MODEL = "moondream";
+const VISION_SYSTEM = "You are a helpful assistant that can see attached images. Answer the user's question about the attached image(s)/video frames clearly and accurately. If multiple images are frames from a video sampled in order, describe what happens across them.";
+const MAX_VIDEO_FRAMES = 4;
+let pendingAttachment = null; // { images: [base64,...], label: string }
+
+function stripDataUrlPrefix(dataUrl) {
+  return dataUrl.split(",")[1];
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function extractVideoFrames(file, count) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.muted = true;
+    video.src = URL.createObjectURL(file);
+    const frames = [];
+    let timestamps = [];
+    let idx = 0;
+    const canvas = document.createElement("canvas");
+
+    function captureAndAdvance() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      frames.push(stripDataUrlPrefix(canvas.toDataURL("image/jpeg", 0.8)));
+      idx++;
+      if (idx >= timestamps.length) {
+        URL.revokeObjectURL(video.src);
+        resolve(frames);
+      } else {
+        video.currentTime = timestamps[idx];
+      }
+    }
+
+    video.addEventListener("loadedmetadata", () => {
+      timestamps = Array.from({ length: count }, (_, i) => (video.duration * (i + 0.5)) / count);
+      video.addEventListener("seeked", captureAndAdvance);
+      video.currentTime = timestamps[0];
+    });
+    video.addEventListener("error", () => reject(new Error("Could not read video file")));
+  });
+}
+
+async function handleFileSelected(file) {
+  const preview = document.getElementById("attachmentPreview");
+  preview.innerHTML = '<span>Processing...</span>';
+  preview.classList.add("show");
+  try {
+    if (file.type.startsWith("video/")) {
+      const images = await extractVideoFrames(file, MAX_VIDEO_FRAMES);
+      pendingAttachment = { images, label: `${file.name} (${images.length} frames)` };
+    } else {
+      const dataUrl = await readFileAsDataUrl(file);
+      pendingAttachment = { images: [stripDataUrlPrefix(dataUrl)], label: file.name };
+      renderAttachmentPreview(dataUrl);
+      return;
+    }
+    renderAttachmentPreview(null);
+  } catch (e) {
+    pendingAttachment = null;
+    preview.innerHTML = `<span>Couldn't read that file: ${e.message}</span>`;
+    setTimeout(() => preview.classList.remove("show"), 2500);
+  }
+}
+
+function renderAttachmentPreview(thumbnailDataUrl) {
+  const preview = document.getElementById("attachmentPreview");
+  preview.innerHTML = "";
+  if (thumbnailDataUrl) {
+    const img = document.createElement("img");
+    img.src = thumbnailDataUrl;
+    preview.appendChild(img);
+  }
+  const label = document.createElement("span");
+  label.textContent = pendingAttachment.label;
+  preview.appendChild(label);
+  const remove = document.createElement("span");
+  remove.className = "remove-attachment";
+  remove.textContent = "✕";
+  remove.addEventListener("click", clearAttachment);
+  preview.appendChild(remove);
+  preview.classList.add("show");
+}
+
+function clearAttachment() {
+  pendingAttachment = null;
+  document.getElementById("attachmentPreview").classList.remove("show");
+  document.getElementById("fileInput").value = "";
+}
+
+document.getElementById("attachBtn").addEventListener("click", () => document.getElementById("fileInput").click());
+document.getElementById("fileInput").addEventListener("change", (e) => {
+  if (e.target.files[0]) handleFileSelected(e.target.files[0]);
+});
+
 async function send() {
   const promptBox = document.getElementById("prompt");
   const raw = promptBox.value.trim();
-  if (!raw) return;
+  if (!raw && !pendingAttachment) return;
 
   let chat = getActiveChat();
   if (!chat) { await newChat(); chat = getActiveChat(); }
+
+  if (pendingAttachment) {
+    await sendVisionMessage(chat, raw);
+    return;
+  }
 
   let text = raw;
   if (raw.startsWith("/")) {
@@ -1138,6 +1268,73 @@ async function send() {
     chat.messages.push({ role: "assistant", content: full + (aborted ? "\n\n*[stopped]*" : ""), model: chat.model });
     await persistChat(chat);
     if (!aborted) maybeExtractMemory(getModel(chat).ollama, text, full);
+  }
+  currentAbortController = null;
+  setGenerating(false);
+  if (!mobileMedia.matches) promptBox.focus();
+}
+
+// Vision requests are a one-off Q&A against moondream, not a continuing
+// multimodal conversation - prior Koda/Soi chat history isn't sent, since
+// moondream has no context of it and mixing an incompatible model's
+// history in would just confuse a 1.8B model. The raw image/frame bytes
+// aren't persisted to Supabase either (would bloat every row indefinitely)
+// - only a text label survives in chat history after this turn.
+async function sendVisionMessage(chat, caption) {
+  const promptBox = document.getElementById("prompt");
+  const attachment = pendingAttachment;
+  const text = caption || "Describe what's in this.";
+  promptBox.value = "";
+  setGenerating(true);
+  chat.messages.push({ role: "user", content: `📎 ${attachment.label}${caption ? "\n" + caption : ""}` });
+  if (chat.title === "New chat") chat.title = `📎 ${attachment.label}`.slice(0, 40);
+  clearAttachment();
+  await persistChat(chat);
+  render();
+  const assistantDiv = addThinkingBubble(getModel(chat).avatar);
+
+  currentAbortController = new AbortController();
+  let full = "";
+  try {
+    const res = await fetch("http://localhost:11434/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: currentAbortController.signal,
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        messages: [
+          { role: "system", content: VISION_SYSTEM },
+          { role: "user", content: text, images: attachment.images },
+        ],
+        stream: true,
+      }),
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const chunk = JSON.parse(line);
+        full += chunk.message?.content || "";
+        renderMessageContent(assistantDiv, full);
+        assistantDiv.scrollIntoView();
+      }
+    }
+  } catch (e) {
+    if (e.name !== "AbortError") {
+      renderMessageContent(assistantDiv, "Error: " + e.message + "\n(Is `ollama serve` running, with `ollama pull moondream` done?)");
+    }
+  }
+
+  if (full) {
+    chat.messages.push({ role: "assistant", content: full, model: chat.model });
+    await persistChat(chat);
   }
   currentAbortController = null;
   setGenerating(false);

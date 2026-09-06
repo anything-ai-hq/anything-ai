@@ -54,6 +54,12 @@ Pages rebuilds automatically in under a minute, no separate deploy command neede
 
 Any browser hitting this page needs its own local Ollama, with `OLLAMA_ORIGINS` including `https://anything-ai-hq.github.io` (see the in-app "Instructions" page for the exact fix).
 
+## Vision (screenshots + video frames)
+```
+ollama pull moondream
+```
+Koda/Soi are text-only (Qwen2.5-Coder has no vision tower), so attaching a screenshot or video (📎 button in the input row) routes to `moondream` instead - a separate small (1.8B) vision model, not a capability of the chat models themselves. Video "understanding" samples 4 frames client-side (HTML5 `<video>` + `<canvas>`, no server-side ffmpeg) and describes them as a set of images - a summary of sampled frames, not continuous video understanding, which nothing at this scale actually does locally. Vision replies don't carry prior chat history (moondream has no context of a Koda/Soi conversation) and raw image bytes aren't persisted to Supabase (would bloat every row) - only a text label survives after the turn.
+
 ## Vela (image generation)
 ```
 .venv\Scripts\python vela_server.py
