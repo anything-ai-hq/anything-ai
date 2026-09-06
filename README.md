@@ -40,6 +40,20 @@ Open http://localhost:8000/chat.html — plain HTML/JS, talks straight to Ollama
 
 Accounts + data (chats, agents, memory, settings) are backed by Supabase (free tier) — email magic-link sign-in, Postgres tables locked down with row-level security so each account only sees its own rows. Set up once: create a Supabase project, run `supabase_schema.sql` in its SQL Editor, then drop the project's URL and anon/publishable key into the `SUPABASE_URL`/`SUPABASE_ANON_KEY` constants near the top of `chat.html`'s script. Detects if Ollama isn't reachable on load (not installed, or blocked by Ollama's CORS allowlist — set `OLLAMA_ORIGINS` to this page's origin if so) and prompts to fix it.
 
+## Live site
+
+Hosted free on GitHub Pages: **https://jackcahill1403-dot.github.io/anything-ai/**
+
+To publish an update:
+```
+git add -A
+git commit -m "..."
+git push github-pages master
+```
+Pages rebuilds automatically in under a minute, no separate deploy command needed. (We started on Netlify but its team account hit an undocumented billing block on new deploys — GitHub Pages has no such credit system and just works off a plain push.)
+
+Any browser hitting this page needs its own local Ollama, with `OLLAMA_ORIGINS` including `https://jackcahill1403-dot.github.io` (see the in-app "Instructions" page for the exact fix).
+
 ## Studio plugin
 Copy `studio_plugin/AICoder.lua` into `%LOCALAPPDATA%\Roblox\Plugins\`.
 In Studio: Game Settings > Security > enable "Allow HTTP Requests".
