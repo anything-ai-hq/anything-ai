@@ -42,6 +42,14 @@
     --font-body: 'Inter', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   }
+  /* Subscriber-only theme presets - swap accent/surface tones only, layout
+     stays identical. Applied via [data-theme] on <html>. */
+  :root[data-theme="solar"] {
+    --accent: #ff9d4d; --accent-dim: #99551f; --surface-raised: #1e1a15; --surface-hover: #26201a;
+  }
+  :root[data-theme="noir"] {
+    --accent: #cfcfd4; --accent-dim: #6c6c70; --surface-raised: #1a1a1a; --surface-hover: #212121;
+  }
   /* iOS Safari auto-zooms into any input/select/textarea with font-size under
      16px on focus - this keeps every form control at or above that threshold. */
   input, select, textarea { font-size: 16px; font-family: var(--font-body); }
@@ -323,6 +331,9 @@
   #closeSettings, #closeAgents { background: var(--surface-hover); color: var(--chrome-hi); }
   #closeSettings:hover, #closeAgents:hover { background: var(--border); }
   hr.divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .hint { font-size: 12px; color: var(--chrome-dim); margin: -6px 0 10px; }
+  #settingsPanel h4 { font-size: 13px; margin: 4px 0 8px; color: var(--chrome-mid); }
+  #subscriberSettings > input { width: 100%; margin-bottom: 8px; padding: 8px 10px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px; color: var(--chrome-hi); box-sizing: border-box; }
 
   #loginName { width: 100%; padding: 11px; background: var(--surface); color: var(--chrome-hi); border: 1px solid var(--border); border-radius: 8px; margin: 14px 0; text-align: center; }
   /* Browser autofill (esp. Chrome) forces its own white bg + text color otherwise,
@@ -422,6 +433,27 @@
       </select>
     </div>
     <hr class="divider">
+    <div id="subscriberSettings" style="display:none;">
+      <div class="setting-row">
+        <label>Theme</label>
+        <select id="setTheme">
+          <option value="mercury">Mercury (default)</option>
+          <option value="solar">Solar</option>
+          <option value="noir">Noir</option>
+        </select>
+      </div>
+      <h4>Custom models (your API key)</h4>
+      <p class="hint">Sent straight from your browser to that provider — stored only in your own account, never on our servers.</p>
+      <div id="customModelList"></div>
+      <input id="cmName" placeholder="Display name (e.g. GPT-4o)">
+      <input id="cmBaseUrl" placeholder="Endpoint URL (e.g. https://api.openai.com/v1/chat/completions)">
+      <input id="cmModel" placeholder="Model id (e.g. gpt-4o)">
+      <input id="cmApiKey" type="password" placeholder="API key">
+      <div class="actions">
+        <button id="addCustomModel">Add model</button>
+      </div>
+      <hr class="divider">
+    </div>
     <label class="toggle-row"><input type="checkbox" id="useLegacyUI"> Use legacy interface</label>
     <div class="actions">
       <button id="closeSettings">Close</button>
@@ -508,6 +540,7 @@ const EFFORT = {
   low: { label: "Low effort", options: { temperature: 0.2, num_predict: 256 }, nudge: "Be brief and direct." },
   medium: { label: "Medium effort", options: { temperature: 0.4, num_predict: 512 }, nudge: "" },
   high: { label: "High effort", options: { temperature: 0.6, num_predict: 1024 }, nudge: "Think through edge cases carefully before answering, and explain your reasoning." },
+  max: { label: "Max effort", options: { temperature: 0.7, num_predict: 2048 }, nudge: "Think through edge cases exhaustively, weigh multiple approaches, and be as thorough as possible.", subscriberOnly: true },
 };
 const DEFAULT_EFFORT_ID = "medium";
 
@@ -529,7 +562,7 @@ const PERSONA = {
   },
 };
 
-const DEFAULT_SETTINGS = { displayName: "", enthusiasm: "low", emojis: "low", sarcasm: "low" };
+const DEFAULT_SETTINGS = { displayName: "", enthusiasm: "low", emojis: "low", sarcasm: "low", customModels: [] };
 
 // Real accounts via Supabase (free tier): email magic-link auth, and every
 // chat/agent/memory-fact/setting lives in Postgres behind row-level security
@@ -545,6 +578,15 @@ let myPermissions = null; // { models, subscribed, is_dev, images_used_today, us
 function hasVelaAccess() {
   if (!myPermissions) return false;
   return myPermissions.is_dev || myPermissions.subscribed || (myPermissions.models || []).includes("vela");
+}
+// Perks tied to the £1.99 one-time-purchase tier specifically (not the
+// per-user Vela grant, which is separate and admin-assignable on its own).
+function hasSubscription() {
+  return !!(myPermissions?.is_dev || myPermissions?.subscribed);
+}
+function applyTheme() {
+  const theme = hasSubscription() ? localStorage.getItem("anything_ai_theme") || "mercury" : "mercury";
+  document.documentElement.dataset.theme = theme;
 }
 let settings = { ...DEFAULT_SETTINGS };
 let chats = [];
@@ -562,6 +604,7 @@ async function saveSettings(s) {
     enthusiasm: s.enthusiasm,
     emojis: s.emojis,
     sarcasm: s.sarcasm,
+    custom_models: s.customModels,
   });
 }
 
@@ -576,7 +619,7 @@ async function loadAllData() {
   agents = (agentsRes.data || []).map((r) => ({ id: r.id, name: r.name, prompt: r.prompt }));
   memory = (memoryRes.data || []).map((r) => ({ id: r.id, fact: r.fact }));
   settings = settingsRes.data
-    ? { displayName: settingsRes.data.display_name || "", enthusiasm: settingsRes.data.enthusiasm, emojis: settingsRes.data.emojis, sarcasm: settingsRes.data.sarcasm }
+    ? { displayName: settingsRes.data.display_name || "", enthusiasm: settingsRes.data.enthusiasm, emojis: settingsRes.data.emojis, sarcasm: settingsRes.data.sarcasm, customModels: settingsRes.data.custom_models || [] }
     : { ...DEFAULT_SETTINGS };
 }
 
@@ -779,7 +822,7 @@ mobileMedia.addEventListener("change", placeModelEffortControls);
 function renderModelSelect() {
   const sel = document.getElementById("modelSelect");
   sel.innerHTML = "";
-  for (const [id, m] of Object.entries(MODELS)) {
+  for (const [id, m] of Object.entries(allModels())) {
     const opt = document.createElement("option");
     opt.value = id;
     opt.textContent = m.label;
@@ -795,13 +838,15 @@ function renderEffortSelect() {
   const sel = document.getElementById("effortSelect");
   sel.innerHTML = "";
   for (const [id, e] of Object.entries(EFFORT)) {
+    if (e.subscriberOnly && !hasSubscription()) continue;
     const opt = document.createElement("option");
     opt.value = id;
     opt.textContent = e.label;
     sel.appendChild(opt);
   }
   const chat = getActiveChat();
-  sel.value = chat?.effort || currentEffortId;
+  const wanted = chat?.effort || currentEffortId;
+  sel.value = EFFORT[wanted]?.subscriberOnly && !hasSubscription() ? DEFAULT_EFFORT_ID : wanted;
   sel._syncDropdown?.();
 }
 
@@ -850,8 +895,20 @@ function renderAgentList() {
   }
 }
 
+// Subscriber perk: bring-your-own API key for any OpenAI-compatible chat
+// endpoint. The key is sent straight from the browser to that provider and
+// stored only in the user's own settings row (RLS-protected) - it never
+// passes through Anything.ai's own infrastructure, because there isn't one.
+function allModels() {
+  if (!hasSubscription()) return MODELS;
+  const custom = {};
+  for (const cm of settings.customModels || []) {
+    custom[`custom:${cm.id}`] = { label: `${cm.name} (custom)`, avatar: null, custom: true, baseUrl: cm.baseUrl, apiKey: cm.apiKey, model: cm.model, system: "" };
+  }
+  return { ...MODELS, ...custom };
+}
 function getModel(chat) {
-  return MODELS[chat?.model] || MODELS[DEFAULT_MODEL_ID];
+  return allModels()[chat?.model] || MODELS[DEFAULT_MODEL_ID];
 }
 
 function getEffort(chat) {
@@ -1238,13 +1295,33 @@ async function send() {
   let full = "";
   let aborted = false;
   const debugStart = performance.now();
+  const model = getModel(chat);
   try {
+    if (model.custom) {
+      // Bring-your-own-key models: a plain non-streaming OpenAI-compatible
+      // call. No SSE parsing here - honest simplification, not every
+      // provider's streaming format matches, a single response is reliable.
+      const res = await fetch(model.baseUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${model.apiKey}` },
+        signal: currentAbortController.signal,
+        body: JSON.stringify({
+          model: model.model,
+          messages: [{ role: "system", content: buildSystemPrompt(chat) }, ...apiMessages(chat)],
+          temperature: getEffort(chat).options.temperature,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`);
+      full = data.choices?.[0]?.message?.content || "";
+      renderMessageContent(assistantDiv, full);
+    } else {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: currentAbortController.signal,
       body: JSON.stringify({
-        model: getModel(chat).ollama,
+        model: model.ollama,
         messages: [{ role: "system", content: buildSystemPrompt(chat) }, ...apiMessages(chat)],
         options: getEffort(chat).options,
         stream: true,
@@ -1267,23 +1344,24 @@ async function send() {
         assistantDiv.scrollIntoView();
       }
     }
+    }
   } catch (e) {
     if (e.name === "AbortError") {
       aborted = true;
     } else {
-      renderMessageContent(assistantDiv, "Error: " + e.message + "\n(Is `ollama serve` running?)");
+      renderMessageContent(assistantDiv, "Error: " + e.message + (model.custom ? "" : "\n(Is `ollama serve` running?)"));
     }
   }
 
   if (full) {
     chat.messages.push({ role: "assistant", content: full + (aborted ? "\n\n*[stopped]*" : ""), model: chat.model });
     await persistChat(chat);
-    if (!aborted) maybeExtractMemory(getModel(chat).ollama, text, full);
+    if (!aborted && !model.custom) maybeExtractMemory(model.ollama, text, full);
     if (myPermissions?.is_dev) {
       const ms = Math.round(performance.now() - debugStart);
       assistantDiv.closest(".msg")?.insertAdjacentHTML(
         "beforeend",
-        `<div class="debug-info">model: ${getModel(chat).ollama} · effort: ${getEffort(chat).label} · ${ms}ms</div>`
+        `<div class="debug-info">model: ${model.ollama || model.model} · effort: ${getEffort(chat).label} · ${ms}ms</div>`
       );
     }
   }
@@ -1381,7 +1459,51 @@ document.getElementById("settingsBtn").addEventListener("click", () => {
   document.getElementById("setEmojis").value = settings.emojis;
   document.getElementById("setSarcasm").value = settings.sarcasm;
   document.getElementById("useLegacyUI").checked = false;
+  document.getElementById("subscriberSettings").style.display = hasSubscription() ? "block" : "none";
+  if (hasSubscription()) {
+    document.getElementById("setTheme").value = localStorage.getItem("anything_ai_theme") || "mercury";
+    renderCustomModelList();
+  }
   overlay.classList.add("open");
+});
+document.getElementById("setTheme").addEventListener("change", (e) => {
+  localStorage.setItem("anything_ai_theme", e.target.value);
+  applyTheme();
+});
+function renderCustomModelList() {
+  const list = document.getElementById("customModelList");
+  list.innerHTML = "";
+  if (!settings.customModels.length) { list.textContent = "No custom models yet."; return; }
+  for (const cm of settings.customModels) {
+    const item = document.createElement("div");
+    item.className = "agent-item";
+    const name = document.createElement("span");
+    name.textContent = `${cm.name} — ${cm.model}`;
+    const del = document.createElement("span");
+    del.className = "del";
+    del.textContent = "✕";
+    del.addEventListener("click", async () => {
+      settings.customModels = settings.customModels.filter((x) => x.id !== cm.id);
+      await saveSettings(settings);
+      renderCustomModelList();
+      renderModelSelect();
+    });
+    item.appendChild(name);
+    item.appendChild(del);
+    list.appendChild(item);
+  }
+}
+document.getElementById("addCustomModel").addEventListener("click", async () => {
+  const name = document.getElementById("cmName").value.trim();
+  const baseUrl = document.getElementById("cmBaseUrl").value.trim();
+  const model = document.getElementById("cmModel").value.trim();
+  const apiKey = document.getElementById("cmApiKey").value.trim();
+  if (!name || !baseUrl || !model || !apiKey) return;
+  settings.customModels = [...settings.customModels, { id: crypto.randomUUID(), name, baseUrl, model, apiKey }];
+  await saveSettings(settings);
+  for (const id of ["cmName", "cmBaseUrl", "cmModel", "cmApiKey"]) document.getElementById(id).value = "";
+  renderCustomModelList();
+  renderModelSelect();
 });
 document.getElementById("closeSettings").addEventListener("click", () => overlay.classList.remove("open"));
 document.getElementById("setDisplayName").addEventListener("change", (e) => {
@@ -1602,6 +1724,7 @@ db.auth.onAuthStateChange(async (event, session) => {
     myPermissions = perm || null;
     document.getElementById("adminLink").style.display = ADMIN_EMAILS.includes(currentUser.email) ? "block" : "none";
     maybeShowVelaPopup();
+    applyTheme();
     if (!activeChatId || !getActiveChat()) {
       if (chats.length) activeChatId = chats[0].id;
       else await newChat();
@@ -1617,6 +1740,7 @@ db.auth.onAuthStateChange(async (event, session) => {
     memory = [];
     settings = { ...DEFAULT_SETTINGS };
     activeChatId = null;
+    document.documentElement.dataset.theme = "mercury";
     render();
     showLogin();
   }
