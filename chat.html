@@ -98,6 +98,8 @@
   #utilityRow { margin-top: auto; display: flex; gap: 6px; }
   #changelogLink { display: block; text-align: center; margin-top: 8px; font-size: 11px; color: var(--chrome-dim); text-decoration: none; }
   #changelogLink:hover { color: var(--chrome-mid); text-decoration: underline; }
+  #adminLink { display: block; text-align: center; margin-top: 4px; font-size: 11px; color: var(--chrome-dim); text-decoration: none; }
+  #adminLink:hover { color: var(--chrome-mid); text-decoration: underline; }
   .utility-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
     padding: 10px 4px 9px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised);
@@ -264,6 +266,7 @@
     background: linear-gradient(rgba(6,6,7,0.55), rgba(6,6,7,0.75)), url('assets/login-bg.jpg') center/cover;
   }
   #loginOverlay.hidden { display: none; }
+  .debug-info { font-family: var(--font-mono); font-size: 10px; color: var(--chrome-dim); opacity: 0.7; margin-top: 4px; }
   #velaOverlay { display: none; z-index: 40; }
   #velaOverlay.open { display: flex; }
   #velaOverlay.hidden { display: none; }
@@ -364,6 +367,7 @@
     <a id="instructionsBtn" class="utility-btn" href="instructions.html" target="_blank" rel="noopener"><img class="icon" src="assets/help-icon.png" alt="">Help</a>
   </div>
   <a id="changelogLink" href="changelog.html" target="_blank" rel="noopener">What's new</a>
+  <a id="adminLink" href="admin.html" target="_blank" rel="noopener" style="display:none;">Admin</a>
 </div>
 <div id="sidebarBackdrop"></div>
 
@@ -535,7 +539,13 @@ const SUPABASE_URL = "https://uanxpfczolevgvqinvfr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_RE8YzohDnvgtj83qmQ7Iew_4y4ZFL4o";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const ADMIN_EMAILS = ["jackcahill1403@outlook.com", "anythiny-ai-hq@outlook.com"];
 let currentUser = null;
+let myPermissions = null; // { models, subscribed, is_dev, images_used_today, usage_day }
+function hasVelaAccess() {
+  if (!myPermissions) return false;
+  return myPermissions.is_dev || myPermissions.subscribed || (myPermissions.models || []).includes("vela");
+}
 let settings = { ...DEFAULT_SETTINGS };
 let chats = [];
 let activeChatId = null;
@@ -1227,6 +1237,7 @@ async function send() {
   currentAbortController = new AbortController();
   let full = "";
   let aborted = false;
+  const debugStart = performance.now();
   try {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
@@ -1268,6 +1279,13 @@ async function send() {
     chat.messages.push({ role: "assistant", content: full + (aborted ? "\n\n*[stopped]*" : ""), model: chat.model });
     await persistChat(chat);
     if (!aborted) maybeExtractMemory(getModel(chat).ollama, text, full);
+    if (myPermissions?.is_dev) {
+      const ms = Math.round(performance.now() - debugStart);
+      assistantDiv.closest(".msg")?.insertAdjacentHTML(
+        "beforeend",
+        `<div class="debug-info">model: ${getModel(chat).ollama} · effort: ${getEffort(chat).label} · ${ms}ms</div>`
+      );
+    }
   }
   currentAbortController = null;
   setGenerating(false);
@@ -1444,24 +1462,37 @@ initDropdown("effortSelect");
 initDropdown("agentSelect");
 placeModelEffortControls();
 
-// Vela teaser popup: shows once per browser (not once per account - this is
-// a localStorage flag, not tied to sign-in), with a real live-generation
-// demo hitting the local Vela server as the "hint" rather than a static
-// coming-soon image.
+// Vela teaser popup. Two tracks: users WITHOUT access get the old one-shot
+// localStorage-gated hint; users WITH access (dev / subscribed / granted via
+// the admin editor) get a real quota-checked popup, enforced server-side by
+// the use_image_generation() Postgres function - not just a client counter.
 const VELA_URL = "http://localhost:7860/generate";
-if (!localStorage.getItem("vela_popup_seen")) {
-  document.getElementById("velaOverlay").classList.add("open");
+
+function maybeShowVelaPopup() {
+  if (hasVelaAccess()) {
+    document.getElementById("velaIntro").querySelector("p").textContent =
+      "Our third model — local image generation, running the same way Koda and Soi do. You have access. Full chat integration is coming soon; generate here for now.";
+    if (!localStorage.getItem("vela_popup_seen_granted")) {
+      document.getElementById("velaOverlay").classList.add("open");
+    }
+  } else if (!localStorage.getItem("vela_popup_seen")) {
+    document.getElementById("velaOverlay").classList.add("open");
+  }
+  if (localStorage.getItem("vela_demo_used") && !hasVelaAccess()) {
+    lockVelaDemo("You've used your early hint — full Vela access is coming soon.");
+  }
 }
 function closeVelaPopup() {
   localStorage.setItem("vela_popup_seen", "true");
+  localStorage.setItem("vela_popup_seen_granted", "true");
   document.getElementById("velaOverlay").classList.remove("open");
 }
 document.getElementById("closeVela").addEventListener("click", closeVelaPopup);
 document.getElementById("velaPrompt").addEventListener("keydown", (e) => { if (e.key === "Enter") generateVela(); });
 document.getElementById("velaGenerate").addEventListener("click", generateVela);
 
-// The demo is one free generation, not unlimited access - a hint, not the
-// product. Errors (e.g. server not running) don't burn the one shot.
+// The no-access demo is one free generation, not unlimited access - a hint,
+// not the product. Errors (e.g. server not running) don't burn the one shot.
 function lockVelaDemo(message) {
   document.getElementById("velaPrompt").disabled = true;
   document.getElementById("velaGenerate").disabled = true;
@@ -1470,16 +1501,27 @@ function lockVelaDemo(message) {
     `<div class="vela-status">${message}</div>`
   );
 }
-if (localStorage.getItem("vela_demo_used")) {
-  lockVelaDemo("You've used your early hint — full Vela access is coming soon.");
-}
 
 async function generateVela() {
   const promptBox = document.getElementById("velaPrompt");
   const genBtn = document.getElementById("velaGenerate");
   const result = document.getElementById("velaResult");
   const prompt = promptBox.value.trim();
-  if (!prompt || localStorage.getItem("vela_demo_used")) return;
+  if (!prompt) return;
+
+  if (hasVelaAccess()) {
+    const { data: quota, error: quotaErr } = await db.rpc("use_image_generation");
+    if (quotaErr || !quota?.allowed) {
+      const reason = quota?.reason === "limit_reached"
+        ? "You've hit your 20 images/day limit — resets tomorrow."
+        : "Vela access check failed. Try again shortly.";
+      result.innerHTML = `<div class="vela-status">${reason}</div>`;
+      return;
+    }
+  } else if (localStorage.getItem("vela_demo_used")) {
+    return;
+  }
+
   genBtn.disabled = true;
   result.innerHTML = '<div class="vela-status">Generating...</div>';
   try {
@@ -1494,8 +1536,13 @@ async function generateVela() {
       const img = document.createElement("img");
       img.src = data.image;
       result.appendChild(img);
-      localStorage.setItem("vela_demo_used", "true");
-      lockVelaDemo("That's your one early hint — full Vela access is coming soon.");
+      if (hasVelaAccess()) {
+        genBtn.disabled = false;
+        result.insertAdjacentHTML("beforeend", '<div class="vela-status">Generated. Quota resets daily.</div>');
+      } else {
+        localStorage.setItem("vela_demo_used", "true");
+        lockVelaDemo("That's your one early hint — full Vela access is coming soon.");
+      }
     } else {
       result.innerHTML = `<div class="vela-status">${data.error || "Something went wrong."}</div>`;
       genBtn.disabled = false;
@@ -1551,6 +1598,10 @@ db.auth.onAuthStateChange(async (event, session) => {
     currentUser = session.user;
     document.getElementById("loginOverlay").classList.add("hidden");
     await loadAllData();
+    const { data: perm } = await db.from("permissions").select("*").eq("user_id", currentUser.id).maybeSingle();
+    myPermissions = perm || null;
+    document.getElementById("adminLink").style.display = ADMIN_EMAILS.includes(currentUser.email) ? "block" : "none";
+    maybeShowVelaPopup();
     if (!activeChatId || !getActiveChat()) {
       if (chats.length) activeChatId = chats[0].id;
       else await newChat();
@@ -1560,6 +1611,7 @@ db.auth.onAuthStateChange(async (event, session) => {
     renderAgentSelect();
   } else {
     currentUser = null;
+    myPermissions = null;
     chats = [];
     agents = [];
     memory = [];

@@ -1,0 +1,185 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Anything.ai</title>
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg-void: #0a0a0b;
+    --surface: #131315;
+    --chrome-hi: #eeeef1;
+    --chrome-mid: #9a9aa2;
+    --chrome-dim: #616168;
+    --border: #29292d;
+    --accent: #5b8cff;
+    --danger: #ff5b6e;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: var(--font-body); margin: 0; padding: 2.5rem 1.25rem 5rem; background: var(--bg-void);
+    color: var(--chrome-hi); line-height: 1.6; min-height: 100vh; position: relative;
+  }
+  body::before {
+    content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(180,180,190,0.09), transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(230,230,236,0.06), transparent 40%);
+    filter: blur(40px);
+  }
+  .page {
+    max-width: 980px; margin: 0 auto; background: linear-gradient(160deg, rgba(40,40,45,0.5), rgba(20,20,23,0.65));
+    backdrop-filter: blur(28px) saturate(150%); -webkit-backdrop-filter: blur(28px) saturate(150%);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; padding: 2.5rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08); position: relative; overflow: hidden;
+  }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; margin: 0 0 0.25rem; letter-spacing: -0.01em; }
+  .back { display: inline-block; margin-bottom: 1.5rem; color: var(--chrome-dim); text-decoration: none; }
+  .back:hover { color: var(--chrome-mid); }
+  p { color: var(--chrome-mid); }
+  .topbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 1.2rem; }
+  button {
+    font-family: var(--font-body); font-size: 13px; font-weight: 500; cursor: pointer;
+    background: rgba(255,255,255,0.06); color: var(--chrome-hi); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px; transition: background 0.15s;
+  }
+  button:hover { background: rgba(255,255,255,0.12); }
+  button.danger { border-color: rgba(255,91,110,0.4); color: var(--danger); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { color: var(--chrome-dim); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; }
+  td.email { font-family: var(--font-mono); font-size: 12px; color: var(--chrome-hi); }
+  label.check { display: inline-flex; align-items: center; gap: 6px; color: var(--chrome-mid); cursor: pointer; }
+  .quota { font-family: var(--font-mono); color: var(--chrome-mid); }
+  .quota.dev { color: var(--accent); }
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 999px; background: rgba(91,140,255,0.15); color: var(--accent); margin-left: 6px; }
+  #status { color: var(--chrome-dim); font-size: 13px; }
+  #deniedNote { display: none; }
+</style>
+</head>
+<body>
+
+<div class="page">
+<a class="back" href="chat.html">&larr; Back to chat</a>
+<h1>Admin</h1>
+<p>Manage model access, subscriptions, and usage. Visible only to designated admin accounts.</p>
+
+<div id="deniedNote">
+  <p><strong>Not authorized.</strong> Sign in to chat.html with an admin account first, then reopen this page.</p>
+</div>
+
+<div id="adminArea" style="display:none;">
+  <div class="topbar">
+    <span id="status">Loading users...</span>
+    <button id="resetAllBtn" class="danger">Reset everyone's usage</button>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Vela</th>
+          <th>Subscribed (£2.99)</th>
+          <th>Dev</th>
+          <th>Images today</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="userRows"></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<script>
+const SUPABASE_URL = "https://uanxpfczolevgvqinvfr.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_RE8YzohDnvgtj83qmQ7Iew_4y4ZFL4o";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const ADMIN_EMAILS = ["jackcahill1403@outlook.com", "anythiny-ai-hq@outlook.com"];
+const DAILY_LIMIT = 20;
+
+function rowHtml(row) {
+  const hasVela = (row.models || []).includes("vela");
+  return `
+    <tr data-id="${row.user_id}">
+      <td class="email">${row.email}${ADMIN_EMAILS.includes(row.email) ? '<span class="badge">admin</span>' : ""}</td>
+      <td><label class="check"><input type="checkbox" class="vela-check" ${hasVela ? "checked" : ""}></label></td>
+      <td><label class="check"><input type="checkbox" class="sub-check" ${row.subscribed ? "checked" : ""}></label></td>
+      <td><label class="check"><input type="checkbox" class="dev-check" ${row.is_dev ? "checked" : ""}></label></td>
+      <td class="quota ${row.is_dev ? "dev" : ""}">${row.is_dev ? "unlimited" : `${row.images_used_today} / ${DAILY_LIMIT}`}</td>
+      <td><button class="reset-one">Reset usage</button></td>
+    </tr>
+  `;
+}
+
+async function updatePermissions(userId, patch) {
+  const { error } = await db.from("permissions").update(patch).eq("user_id", userId);
+  if (error) alert("Update failed: " + error.message);
+}
+
+async function loadUsers() {
+  const status = document.getElementById("status");
+  const { data: profiles, error: pErr } = await db.from("profiles").select("id, email");
+  const { data: perms, error: permErr } = await db.from("permissions").select("*");
+  if (pErr || permErr) {
+    status.textContent = "Failed to load users: " + (pErr?.message || permErr?.message);
+    return;
+  }
+  const rows = profiles.map((p) => ({ ...perms.find((x) => x.user_id === p.id), email: p.email }))
+    .sort((a, b) => a.email.localeCompare(b.email));
+  document.getElementById("userRows").innerHTML = rows.map(rowHtml).join("");
+  status.textContent = `${rows.length} user${rows.length === 1 ? "" : "s"}`;
+
+  document.querySelectorAll("#userRows tr").forEach((tr) => {
+    const userId = tr.dataset.id;
+    tr.querySelector(".vela-check").addEventListener("change", (e) => {
+      const row = rows.find((r) => r.user_id === userId);
+      const models = new Set(row.models || []);
+      e.target.checked ? models.add("vela") : models.delete("vela");
+      updatePermissions(userId, { models: [...models] });
+    });
+    tr.querySelector(".sub-check").addEventListener("change", (e) => {
+      updatePermissions(userId, { subscribed: e.target.checked });
+    });
+    tr.querySelector(".dev-check").addEventListener("change", (e) => {
+      updatePermissions(userId, { is_dev: e.target.checked });
+    });
+    tr.querySelector(".reset-one").addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      await db.rpc("admin_reset_usage", { target_user_id: userId });
+      await loadUsers();
+    });
+  });
+}
+
+document.getElementById("resetAllBtn").addEventListener("click", async () => {
+  if (!confirm("Reset usage counters for every user?")) return;
+  await db.rpc("admin_reset_usage", { target_user_id: null });
+  await loadUsers();
+});
+
+db.auth.onAuthStateChange((event, session) => {
+  const email = session?.user?.email;
+  if (email && ADMIN_EMAILS.includes(email)) {
+    document.getElementById("adminArea").style.display = "block";
+    document.getElementById("deniedNote").style.display = "none";
+    loadUsers();
+  } else {
+    document.getElementById("adminArea").style.display = "none";
+    document.getElementById("deniedNote").style.display = "block";
+  }
+});
+</script>
+</body>
+</html>
