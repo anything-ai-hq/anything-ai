@@ -8,14 +8,16 @@ python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 ```
 
-## New PC setup (already have a trained Koda elsewhere)
-`git clone` alone is **not enough to run Koda** — `models_gguf/*.gguf` (941MB) and `data/luau_corpus.jsonl` are gitignored and don't transport with the repo. `models_gguf/Modelfile` itself IS tracked, but it points at a `.gguf` that won't exist after a fresh clone. Two options:
+## New PC setup
+`git clone` alone is **not enough to run Koda** — `models_gguf/*.gguf` (941MB) and `data/luau_corpus.jsonl` are gitignored and don't transport with the repo. Two options:
 
-1. **Copy the trained artifact** from your other PC: `models_gguf/*.gguf` + `models_gguf/Modelfile` (already in git), then:
+1. **Download the trained weights** — no other PC needed, no retraining:
    ```
+   curl -L -o models_gguf/qwen2.5-coder-1.5b-instruct.Q4_K_M.gguf https://github.com/anything-ai-hq/anything-ai/releases/download/koda-v1/qwen2.5-coder-1.5b-instruct.Q4_K_M.gguf
    ollama create Koda -f models_gguf\Modelfile
    ```
-2. **Retrain from scratch** — no GPU work saved, just the scrape+train+export pipeline below (30-60 min depending on GPU).
+   (`models_gguf/Modelfile` is already tracked in git, no need to download it separately. Full release: https://github.com/anything-ai-hq/anything-ai/releases/tag/koda-v1)
+2. **Retrain from scratch** — no GPU work saved, just the scrape+train+export pipeline below (30-60 min depending on GPU). Only needed if you're changing the training data/method, not for a plain new-PC setup.
 
 Either way, also run:
 ```

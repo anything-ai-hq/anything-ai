@@ -1600,7 +1600,7 @@ const OLLAMA_URL = "http://localhost:11434/api/tags";
 // needs a Modelfile applied on top of a public pull, Koda is a custom
 // fine-tune that can't be pulled from any registry at all.
 const MODEL_FIX = {
-  koda: "Custom fine-tuned model, not in any registry — can't be pulled. Copy <code>models_gguf/*.gguf</code> + <code>Modelfile</code> from wherever you trained it, then: <code>ollama create Koda -f models_gguf\\Modelfile</code> (see README &rarr; \"New PC setup\").",
+  koda: "Custom fine-tuned model, not in any Ollama registry. Download the weights from <a href=\"https://github.com/anything-ai-hq/anything-ai/releases/tag/koda-v1\" target=\"_blank\" rel=\"noopener\">the koda-v1 release</a> into <code>models_gguf/</code>, then: <code>ollama create Koda -f models_gguf\\Modelfile</code> (see README &rarr; \"New PC setup\").",
   soi: "<code>ollama pull qwen2.5-coder:1.5b-instruct</code> then <code>ollama create Soi -f Modelfile</code> (Modelfile text in README).",
   moondream: "<code>ollama pull moondream</code>",
 };
