@@ -26,12 +26,30 @@
   #greeting .logout:hover { color: #ccc; text-decoration: underline; }
 
   #main { flex: 1; display: flex; flex-direction: column; max-width: 800px; margin: 0 auto; width: 100%; padding: 1.5rem; }
+  #menuToggle { display: none; background: #262626; border: 1px solid #444; color: #ddd; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; cursor: pointer; align-self: flex-start; font-size: 16px; }
+  #sidebarBackdrop { display: none; }
+
+  @media (max-width: 700px) {
+    body { display: block; }
+    #sidebar { position: fixed; top: 0; left: 0; height: 100%; width: 260px; z-index: 30; transform: translateX(-100%); transition: transform 0.2s ease; }
+    #sidebar.open { transform: translateX(0); }
+    #sidebarBackdrop.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 25; }
+    #main { max-width: 100%; padding: 1rem; height: 100vh; }
+    #menuToggle { display: block; }
+  }
   #log { flex: 1; display: flex; flex-direction: column; gap: 12px; margin-bottom: 1rem; overflow-y: auto; }
   #emptyGreeting { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #666; }
   .msg { padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; max-width: 90%; }
   .user { background: #2d5a9e; align-self: flex-end; }
-  .assistant { background: #333; align-self: flex-start; font-family: ui-monospace, monospace; }
+  .assistant { background: #333; align-self: flex-start; }
   .info { background: transparent; border: 1px dashed #444; color: #999; align-self: center; font-size: 13px; font-family: ui-monospace, monospace; max-width: 100%; }
+  .msg-text { white-space: pre-wrap; }
+  .code-block { background: #161616; border: 1px solid #333; border-radius: 8px; margin: 8px 0; overflow: hidden; }
+  .code-block-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #1e1e1e; border-bottom: 1px solid #333; font-size: 12px; color: #888; }
+  .code-block-header .copy-btn { padding: 3px 10px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; color: #ccc; font-size: 12px; cursor: pointer; }
+  .code-block-header .copy-btn:hover { background: #333; }
+  .code-block pre { margin: 0; padding: 12px; overflow-x: auto; }
+  .code-block code { font-family: ui-monospace, monospace; font-size: 13px; color: #d4d4d4; white-space: pre; }
   .thinking-dots { display: inline-flex; gap: 4px; padding: 4px 0; }
   .thinking-dots span { width: 6px; height: 6px; border-radius: 50%; background: #888; animation: thinking-bounce 1.2s infinite ease-in-out; }
   .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
@@ -43,8 +61,10 @@
   .pill:hover { background: #333; color: #ddd; }
   button { padding: 10px 18px; border: none; border-radius: 6px; background: #2d5a9e; color: white; cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: default; }
+  #stopBtn { background: #7a2d2d; }
+  #stopBtn:hover { background: #8f3535; }
 
-  #settingsOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+  #settingsOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 32; }
   #settingsOverlay.open { display: flex; }
   #settingsPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 320px; }
   #settingsPanel h3 { margin-top: 0; }
@@ -54,7 +74,7 @@
   #settingsPanel .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
   #closeSettings { background: #444; }
 
-  #loginOverlay { display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 10; }
+  #loginOverlay { display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 45; }
   #loginOverlay.hidden { display: none; }
   #loginPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 320px; text-align: center; }
   #loginPanel h3 { margin-top: 0; }
@@ -69,7 +89,7 @@
   }
   #loginMessage { font-size: 13px; color: #888; margin-top: 8px; min-height: 1em; }
 
-  #ollamaOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; z-index: 20; }
+  #ollamaOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; z-index: 50; }
   #ollamaOverlay.open { display: flex; }
   #ollamaPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 28px; width: 460px; max-width: 90vw; text-align: center; max-height: 85vh; overflow-y: auto; }
   #ollamaPanel h3 { margin-top: 0; }
@@ -80,7 +100,7 @@
   #installOllama { background: #2d5a9e; display: block; text-decoration: none; padding: 10px 18px; border-radius: 6px; color: white; }
   #retryOllama, #continueAnyway { background: #444; }
 
-  #agentsOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+  #agentsOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 32; }
   #agentsOverlay.open { display: flex; }
   #agentsPanel { background: #232323; border: 1px solid #444; border-radius: 10px; padding: 24px; width: 380px; max-height: 80vh; overflow-y: auto; }
   #agentsPanel h3 { margin-top: 0; }
@@ -106,14 +126,17 @@
   <button id="settingsBtn">Settings</button>
   <a id="instructionsBtn" href="instructions.html" target="_blank" rel="noopener">Instructions</a>
 </div>
+<div id="sidebarBackdrop"></div>
 
 <div id="main">
+  <button id="menuToggle">&#9776;</button>
   <div id="log"></div>
   <div id="inputRow">
     <input id="prompt" placeholder="Ask for some Luau code..." autofocus>
     <select id="modelSelect" class="pill"></select>
     <select id="effortSelect" class="pill"></select>
     <button id="send">Send</button>
+    <button id="stopBtn" style="display:none">Stop</button>
   </div>
 </div>
 
@@ -364,6 +387,13 @@ let agents = []; // populated by loadAllData()
 let currentAgentId = localStorage.getItem("luau_current_agent_id") || "";
 let currentModelId = localStorage.getItem("luau_current_model_id") || DEFAULT_MODEL_ID;
 let currentEffortId = localStorage.getItem("luau_current_effort_id") || DEFAULT_EFFORT_ID;
+let currentAbortController = null;
+
+function setGenerating(isGenerating) {
+  document.getElementById("send").style.display = isGenerating ? "none" : "";
+  document.getElementById("stopBtn").style.display = isGenerating ? "" : "none";
+  document.getElementById("prompt").disabled = isGenerating;
+}
 
 // Model/effort pills live next to Send, ChatGPT-style: they show and control
 // the *active chat's* choice (persisted per chat), falling back to the last
@@ -502,7 +532,7 @@ function renderChatList() {
     });
     item.appendChild(title);
     item.appendChild(del);
-    item.addEventListener("click", () => { activeChatId = chat.id; render(); });
+    item.addEventListener("click", () => { activeChatId = chat.id; render(); closeSidebar(); });
     list.appendChild(item);
   }
 }
@@ -567,10 +597,72 @@ function apiMessages(chat) {
   return chat.messages.filter((m) => m.role === "user" || m.role === "assistant");
 }
 
+// Split a message into plain-text and fenced-code segments (```lang\ncode```),
+// handling an unclosed trailing fence too so code blocks render live while
+// streaming instead of only after the closing ``` arrives.
+function parseMessageParts(text) {
+  const parts = [];
+  const closedFence = /```(\w*)\n?([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = closedFence.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push({ type: "text", content: text.slice(lastIndex, match.index) });
+    parts.push({ type: "code", lang: match[1] || "", content: match[2] });
+    lastIndex = closedFence.lastIndex;
+  }
+  const rest = text.slice(lastIndex);
+  const openFence = rest.match(/```(\w*)\n?([\s\S]*)$/);
+  if (openFence) {
+    if (openFence.index > 0) parts.push({ type: "text", content: rest.slice(0, openFence.index) });
+    parts.push({ type: "code", lang: openFence[1] || "", content: openFence[2] });
+  } else if (rest) {
+    parts.push({ type: "text", content: rest });
+  }
+  return parts;
+}
+
+function renderMessageContent(container, text) {
+  container.innerHTML = "";
+  const parts = parseMessageParts(text);
+  for (const part of parts) {
+    if (part.type === "text") {
+      if (!part.content) continue;
+      const span = document.createElement("span");
+      span.className = "msg-text";
+      span.textContent = part.content;
+      container.appendChild(span);
+      continue;
+    }
+    const block = document.createElement("div");
+    block.className = "code-block";
+    const header = document.createElement("div");
+    header.className = "code-block-header";
+    const langLabel = document.createElement("span");
+    langLabel.textContent = part.lang || "code";
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "copy-btn";
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(part.content.trim());
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+    });
+    header.appendChild(langLabel);
+    header.appendChild(copyBtn);
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+    code.textContent = part.content.trim();
+    pre.appendChild(code);
+    block.appendChild(header);
+    block.appendChild(pre);
+    container.appendChild(block);
+  }
+}
+
 function addBubble(role, text) {
   const div = document.createElement("div");
   div.className = "msg " + role;
-  div.textContent = text;
+  renderMessageContent(div, text);
   document.getElementById("log").appendChild(div);
   div.scrollIntoView();
   return div;
@@ -587,7 +679,6 @@ function addThinkingBubble() {
 
 async function send() {
   const promptBox = document.getElementById("prompt");
-  const sendBtn = document.getElementById("send");
   const raw = promptBox.value.trim();
   if (!raw) return;
 
@@ -618,17 +709,21 @@ async function send() {
   }
 
   promptBox.value = "";
-  sendBtn.disabled = true;
+  setGenerating(true);
   chat.messages.push({ role: "user", content: text });
   if (chat.title === "New chat") chat.title = raw.slice(0, 40);
   await persistChat(chat);
   render();
   const assistantDiv = addThinkingBubble();
 
+  currentAbortController = new AbortController();
+  let full = "";
+  let aborted = false;
   try {
     const res = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: currentAbortController.signal,
       body: JSON.stringify({
         model: getModel(chat).ollama,
         messages: [{ role: "system", content: buildSystemPrompt(chat) }, ...apiMessages(chat)],
@@ -638,7 +733,6 @@ async function send() {
     });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let full = "";
     let buf = "";
     while (true) {
       const { done, value } = await reader.read();
@@ -650,24 +744,42 @@ async function send() {
         if (!line.trim()) continue;
         const chunk = JSON.parse(line);
         full += chunk.message?.content || "";
-        assistantDiv.textContent = full;
+        renderMessageContent(assistantDiv, full);
         assistantDiv.scrollIntoView();
       }
     }
-    chat.messages.push({ role: "assistant", content: full });
-    await persistChat(chat);
-    maybeExtractMemory(getModel(chat).ollama, text, full);
   } catch (e) {
-    assistantDiv.textContent = "Error: " + e.message + "\n(Is `ollama serve` running?)";
-  } finally {
-    sendBtn.disabled = false;
-    promptBox.focus();
+    if (e.name === "AbortError") {
+      aborted = true;
+    } else {
+      renderMessageContent(assistantDiv, "Error: " + e.message + "\n(Is `ollama serve` running?)");
+    }
   }
+
+  if (full) {
+    chat.messages.push({ role: "assistant", content: full + (aborted ? "\n\n*[stopped]*" : "") });
+    await persistChat(chat);
+    if (!aborted) maybeExtractMemory(getModel(chat).ollama, text, full);
+  }
+  currentAbortController = null;
+  setGenerating(false);
+  promptBox.focus();
 }
 
 document.getElementById("send").addEventListener("click", send);
+document.getElementById("stopBtn").addEventListener("click", () => currentAbortController?.abort());
+
+function closeSidebar() {
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("sidebarBackdrop").classList.remove("open");
+}
+document.getElementById("menuToggle").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("sidebarBackdrop").classList.toggle("open");
+});
+document.getElementById("sidebarBackdrop").addEventListener("click", closeSidebar);
 document.getElementById("prompt").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
-document.getElementById("newChatBtn").addEventListener("click", newChat);
+document.getElementById("newChatBtn").addEventListener("click", () => { newChat(); closeSidebar(); });
 
 const overlay = document.getElementById("settingsOverlay");
 document.getElementById("settingsBtn").addEventListener("click", () => {
