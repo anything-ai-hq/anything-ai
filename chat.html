@@ -1595,15 +1595,26 @@ document.getElementById("useLegacyUI").addEventListener("change", (e) => {
 // default) — a browser can't tell those apart, so the message covers both.
 const OLLAMA_URL = "http://localhost:11434/api/tags";
 
-// Fixed per model rather than a shared "run: ollama pull X" line because
-// each one needs a different fix: moondream is a plain public pull; Koda
-// and Soi are custom (not in any registry) but both fully self-contained
-// in the models-v1 GitHub Release - no separate base-model pull needed.
+// One PowerShell line per step rather than a single "&&"-chained blob -
+// easier to read, and a copy-paste-all-missing-at-once script is built
+// from these at check time (see checkOllama). Koda/Soi are custom (not in
+// any Ollama registry) but both fully self-contained in the models-v1
+// GitHub Release - no separate base-model pull needed. moondream is a
+// plain public pull.
 const MODEL_RELEASE = "https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1";
-const MODEL_FIX = {
-  koda: `Not in any registry. Download from <a href="https://github.com/anything-ai-hq/anything-ai/releases/tag/models-v1" target="_blank" rel="noopener">the models-v1 release</a>: <code>curl -L -o Koda.gguf ${MODEL_RELEASE}/Koda.gguf && curl -L -o Koda.Modelfile ${MODEL_RELEASE}/Koda.Modelfile && ollama create Koda -f Koda.Modelfile</code>`,
-  soi: `Not in any registry. Download from <a href="https://github.com/anything-ai-hq/anything-ai/releases/tag/models-v1" target="_blank" rel="noopener">the models-v1 release</a>: <code>curl -L -o Soi.gguf ${MODEL_RELEASE}/Soi.gguf && curl -L -o Soi.Modelfile ${MODEL_RELEASE}/Soi.Modelfile && ollama create Soi -f Soi.Modelfile</code>`,
-  moondream: "<code>ollama pull moondream</code>",
+const MODEL_LABEL = { koda: "Koda", soi: "Soi", moondream: "moondream" };
+const MODEL_STEPS = {
+  koda: [
+    `curl -L -o Koda.gguf ${MODEL_RELEASE}/Koda.gguf`,
+    `curl -L -o Koda.Modelfile ${MODEL_RELEASE}/Koda.Modelfile`,
+    `ollama create Koda -f Koda.Modelfile`,
+  ],
+  soi: [
+    `curl -L -o Soi.gguf ${MODEL_RELEASE}/Soi.gguf`,
+    `curl -L -o Soi.Modelfile ${MODEL_RELEASE}/Soi.Modelfile`,
+    `ollama create Soi -f Soi.Modelfile`,
+  ],
+  moondream: [`ollama pull moondream`],
 };
 
 async function checkOllama() {
@@ -1623,10 +1634,32 @@ async function checkOllama() {
     clearTimeout(timeout);
     const data = await res.json();
     const installed = new Set((data.models || []).map((m) => m.name.split(":")[0].toLowerCase()));
-    const missing = Object.keys(MODEL_FIX).filter((m) => !installed.has(m));
+    const missing = Object.keys(MODEL_STEPS).filter((m) => !installed.has(m));
     if (missing.length) {
-      title.textContent = missing.length === 3 ? "No models set up yet" : "Missing model" + (missing.length > 1 ? "s" : "") + ": " + missing.join(", ");
-      message.innerHTML = `<ul style="text-align:left; margin:0; padding-left:20px; line-height:1.7;">${missing.map((m) => `<li><strong>${m}</strong> — ${MODEL_FIX[m]}</li>`).join("")}</ul>`;
+      title.textContent = missing.length === 3 ? "No models set up yet" : "Missing: " + missing.map((m) => MODEL_LABEL[m]).join(", ");
+      const lines = missing.flatMap((m) => MODEL_STEPS[m]);
+      message.innerHTML = `<p style="text-align:left; margin:0 0 8px;">Paste this into PowerShell, then click Retry:</p>`;
+      const box = document.createElement("textarea");
+      box.id = "ollamaFixScript";
+      box.readOnly = true;
+      box.rows = lines.length;
+      box.value = lines.join("\n");
+      box.style.cssText = "width:100%; box-sizing:border-box; font-family:var(--font-mono); font-size:12px; background:var(--surface); color:var(--chrome-hi); border:1px solid var(--border); border-radius:8px; padding:10px; resize:vertical;";
+      box.addEventListener("click", () => box.select());
+      message.appendChild(box);
+      const copyScript = document.createElement("button");
+      copyScript.className = "copy-btn";
+      copyScript.textContent = "Copy commands";
+      copyScript.style.cssText = "margin-top:8px;";
+      copyScript.addEventListener("click", () => {
+        navigator.clipboard.writeText(box.value);
+        copyScript.textContent = "Copied!";
+        setTimeout(() => { copyScript.textContent = "Copy commands"; }, 1500);
+      });
+      message.appendChild(copyScript);
+      if (missing.includes("koda") || missing.includes("soi")) {
+        message.insertAdjacentHTML("beforeend", `<p style="text-align:left; margin:10px 0 0; font-size:12px;">Full release page: <a href="https://github.com/anything-ai-hq/anything-ai/releases/tag/models-v1" target="_blank" rel="noopener">models-v1</a></p>`);
+      }
       const retry = document.createElement("button");
       retry.textContent = "Retry";
       retry.addEventListener("click", checkOllama);
