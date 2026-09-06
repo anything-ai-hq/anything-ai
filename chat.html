@@ -9,6 +9,11 @@
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Anything.ai</title>
+<meta property="og:title" content="Anything.ai">
+<meta property="og:description" content="A local-first AI chat: Koda for Roblox/Luau coding, Soi for everyday help. Runs on your own PC via Ollama.">
+<meta property="og:image" content="https://anything-ai-hq.github.io/anything-ai/assets/social-share.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
@@ -44,7 +49,13 @@
   ::selection { background: var(--accent-dim); color: #fff; }
 
   /* ---------- Sidebar ---------- */
-  #sidebar { width: 240px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border-soft); display: flex; flex-direction: column; padding: 14px; gap: 8px; overflow-y: auto; position: relative; }
+  #sidebar {
+    width: 240px; flex-shrink: 0; display: flex; flex-direction: column; padding: 14px; gap: 8px;
+    overflow-y: auto; position: relative; border-right: 1px solid var(--border-soft);
+    background: linear-gradient(180deg, rgba(30,30,34,0.55), rgba(19,19,21,0.75));
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+  }
   #sidebar::after { content: ""; position: absolute; top: 0; right: -1px; width: 1px; height: 100%; background: linear-gradient(180deg, transparent, var(--chrome-dim) 40%, transparent 80%); opacity: 0.5; }
   #sidebar h3 { margin: 10px 0 6px 4px; font-size: 11px; color: var(--chrome-dim); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
 
@@ -91,7 +102,7 @@
     color: var(--chrome-mid); cursor: pointer; text-decoration: none; font-size: 10.5px; font-family: var(--font-body);
     transition: background 0.15s, color 0.15s, transform 0.15s, border-color 0.15s;
   }
-  .utility-btn .icon { font-size: 16px; line-height: 1; }
+  .utility-btn .icon { width: 20px; height: 20px; object-fit: contain; filter: drop-shadow(0 0 4px rgba(255,255,255,0.15)); }
   .utility-btn:hover { background: var(--surface-hover); color: var(--chrome-hi); border-color: var(--chrome-dim); transform: translateY(-2px); }
 
   #sidebarModelControls { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
@@ -105,26 +116,33 @@
   .dropdown { position: relative; }
   .dropdown-trigger {
     display: flex; align-items: center; gap: 8px; width: auto; padding: 8px 14px;
-    background: var(--surface-hover); color: var(--chrome-mid); border: 1px solid var(--border);
+    background: linear-gradient(160deg, rgba(60,60,66,0.5), rgba(30,30,34,0.5));
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: var(--chrome-mid); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 999px; font-size: 13px; font-family: var(--font-body); cursor: pointer;
     transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
   }
-  .dropdown-trigger:hover { background: var(--border); color: var(--chrome-hi); transform: none; box-shadow: none; }
+  .dropdown-trigger:hover { background: linear-gradient(160deg, rgba(75,75,82,0.55), rgba(38,38,43,0.55)); color: var(--chrome-hi); transform: none; box-shadow: none; }
   .dropdown.open .dropdown-trigger { color: var(--chrome-hi); border-color: var(--chrome-mid); }
   .dropdown-trigger .chevron { font-size: 10px; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); color: var(--chrome-dim); }
   .dropdown.open .dropdown-trigger .chevron { transform: rotate(180deg); }
   .dropdown-menu {
     position: absolute; bottom: calc(100% + 8px); left: 0; min-width: 100%; z-index: 40;
-    background: var(--surface-raised); border: 1px solid var(--border); border-radius: 10px; padding: 5px;
-    box-shadow: 0 12px 32px rgba(0,0,0,0.5); opacity: 0; transform: scale(0.92) translateY(6px);
+    background: linear-gradient(160deg, rgba(50,50,56,0.7), rgba(24,24,27,0.8));
+    backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 5px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08); opacity: 0; transform: scale(0.92) translateY(6px);
     transform-origin: bottom left; pointer-events: none; transition: opacity 0.18s, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   #sidebar .dropdown-menu, #sidebarModelControls .dropdown-menu { bottom: auto; top: calc(100% + 6px); transform-origin: top left; }
   .dropdown.open .dropdown-menu { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
   .dropdown-item {
-    padding: 8px 12px; border-radius: 6px; font-size: 13.5px; color: var(--chrome-mid);
+    padding: 7px 12px; border-radius: 6px; font-size: 13.5px; color: var(--chrome-mid);
     cursor: pointer; white-space: nowrap; transition: background 0.1s, color 0.1s, transform 0.1s;
+    display: flex; align-items: center; gap: 8px;
   }
+  .dropdown-trigger span { display: flex; align-items: center; gap: 8px; }
+  .dropdown-avatar { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
   .dropdown-item:hover { background: var(--surface-hover); color: var(--chrome-hi); transform: translateX(2px); }
   .dropdown-item.active { background: var(--accent-dim); color: #fff; }
   @media (prefers-reduced-motion: reduce) { .dropdown-menu, .dropdown-trigger .chevron { transition: none; } }
@@ -185,15 +203,27 @@
 
   /* ---------- Input bar: floating chrome-edged pill ---------- */
   #inputRow {
-    display: flex; gap: 6px; align-items: center; background: var(--surface-raised);
-    border: 1px solid var(--border); border-radius: 999px; padding: 6px 6px 6px 18px;
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.02), 0 8px 24px rgba(0,0,0,0.35);
+    display: flex; gap: 6px; align-items: center;
+    background: linear-gradient(160deg, rgba(45,45,50,0.55), rgba(22,22,25,0.65));
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 6px 6px 6px 18px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
   }
   #inputRow:focus-within { border-color: var(--chrome-dim); }
   #prompt { flex: 1; padding: 10px 4px; background: transparent; color: var(--chrome-hi); border: none; outline: none; min-width: 0; }
   #prompt::placeholder { color: var(--chrome-dim); }
   #prompt:disabled { opacity: 0.5; }
-  button { padding: 10px 20px; border: none; border-radius: 999px; background: var(--accent); color: #fff; cursor: pointer; font-family: var(--font-body); font-weight: 500; transition: background 0.15s, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s; }
+  button {
+    padding: 10px 20px; border: none; border-radius: 999px; background: var(--accent); color: #fff; cursor: pointer;
+    font-family: var(--font-body); font-weight: 500; position: relative; overflow: hidden;
+    transition: background 0.15s, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s;
+  }
+  button::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 55%);
+    pointer-events: none;
+  }
   button:hover { background: #6f9aff; transform: translateY(-1px) scale(1.03); box-shadow: 0 4px 16px rgba(91,140,255,0.35); }
   button:active { transform: scale(0.95); }
   button:disabled { opacity: 0.5; cursor: default; transform: none !important; box-shadow: none !important; }
@@ -211,11 +241,18 @@
   #agentsOverlay.open { display: flex; }
   #ollamaOverlay { display: none; z-index: 50; }
   #ollamaOverlay.open { display: flex; }
-  #loginOverlay { display: flex; z-index: 45; }
+  #loginOverlay {
+    display: flex; z-index: 45;
+    background: linear-gradient(rgba(6,6,7,0.55), rgba(6,6,7,0.75)), url('assets/login-bg.jpg') center/cover;
+  }
   #loginOverlay.hidden { display: none; }
 
   #settingsPanel, #agentsPanel, #ollamaPanel, #loginPanel {
-    background: var(--surface-raised); border: 1px solid var(--border); border-radius: 14px; padding: 26px;
+    background: linear-gradient(160deg, rgba(40,40,45,0.55), rgba(20,20,23,0.7));
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; padding: 26px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
     position: relative; overflow: hidden; animation: panel-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
   @keyframes panel-in { from { opacity: 0; transform: scale(0.9) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
@@ -278,9 +315,9 @@
   <h3>Chats</h3>
   <div id="chatList"></div>
   <div id="utilityRow">
-    <button id="agentsBtn" class="utility-btn"><span class="icon">🎭</span>Agents</button>
-    <button id="settingsBtn" class="utility-btn"><span class="icon">⚙</span>Settings</button>
-    <a id="instructionsBtn" class="utility-btn" href="instructions.html" target="_blank" rel="noopener"><span class="icon">？</span>Help</a>
+    <button id="agentsBtn" class="utility-btn"><img class="icon" src="assets/agents-icon.png" alt="">Agents</button>
+    <button id="settingsBtn" class="utility-btn"><img class="icon" src="assets/settings-icon.png" alt="">Settings</button>
+    <a id="instructionsBtn" class="utility-btn" href="instructions.html" target="_blank" rel="noopener"><img class="icon" src="assets/help-icon.png" alt="">Help</a>
   </div>
 </div>
 <div id="sidebarBackdrop"></div>
@@ -375,11 +412,13 @@
 const MODELS = {
   koda: {
     label: "Koda — coder assistant",
+    avatar: "assets/koda-avatar.png",
     ollama: "Koda",
     system: "You are Koda, a Luau/Roblox coding assistant. Write correct, idiomatic Luau code for Roblox Studio. Prefer game:GetService(...) patterns, RemoteEvents/RemoteFunctions for client-server communication, and Roblox API conventions. Game-dev topics that can sound sketchy out of context (anti-cheat/anti-exploit code, testing your own game's exploit resistance, obfuscation, server-side validation against cheaters) are normal parts of Roblox development — answer them directly and don't lecture or refuse. Still decline actual requests to cheat in or attack someone else's game.",
   },
   soi: {
     label: "Soi — everyday assistant",
+    avatar: "assets/soi-avatar.png",
     ollama: "Soi",
     system: "You are Soi, a friendly, helpful everyday assistant. Answer clearly and directly across any topic — general questions, writing, planning, advice, casual conversation. You can help with code too, but for deep Roblox/Luau work, Koda is the better tool.",
   },
@@ -589,13 +628,27 @@ function initDropdown(selectId) {
   function close() { wrap.classList.remove("open"); trigger.setAttribute("aria-expanded", "false"); }
 
   function sync() {
-    label.textContent = select.selectedOptions[0]?.textContent || "";
+    const selected = select.selectedOptions[0];
+    label.innerHTML = "";
+    if (selected?.dataset.avatar) {
+      const img = document.createElement("img");
+      img.className = "dropdown-avatar";
+      img.src = selected.dataset.avatar;
+      label.appendChild(img);
+    }
+    label.append(selected?.textContent || "");
     menu.innerHTML = "";
     for (const opt of select.options) {
       const item = document.createElement("div");
       item.className = "dropdown-item" + (opt.value === select.value ? " active" : "");
-      item.textContent = opt.textContent;
       item.setAttribute("role", "option");
+      if (opt.dataset.avatar) {
+        const img = document.createElement("img");
+        img.className = "dropdown-avatar";
+        img.src = opt.dataset.avatar;
+        item.appendChild(img);
+      }
+      item.append(opt.textContent);
       item.addEventListener("click", () => {
         select.value = opt.value;
         select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -649,6 +702,7 @@ function renderModelSelect() {
     const opt = document.createElement("option");
     opt.value = id;
     opt.textContent = m.label;
+    if (m.avatar) opt.dataset.avatar = m.avatar;
     sel.appendChild(opt);
   }
   const chat = getActiveChat();
