@@ -8,6 +8,23 @@ python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 ```
 
+## New PC setup (already have a trained Koda elsewhere)
+`git clone` alone is **not enough to run Koda** — `models_gguf/*.gguf` (941MB) and `data/luau_corpus.jsonl` are gitignored and don't transport with the repo. `models_gguf/Modelfile` itself IS tracked, but it points at a `.gguf` that won't exist after a fresh clone. Two options:
+
+1. **Copy the trained artifact** from your other PC: `models_gguf/*.gguf` + `models_gguf/Modelfile` (already in git), then:
+   ```
+   ollama create Koda -f models_gguf\Modelfile
+   ```
+2. **Retrain from scratch** — no GPU work saved, just the scrape+train+export pipeline below (30-60 min depending on GPU).
+
+Either way, also run:
+```
+ollama pull qwen2.5-coder:1.5b-instruct
+ollama create Soi -f Modelfile          # Modelfile snippet is further down this README
+ollama pull moondream                   # vision model, silently required for screenshot/video attach
+```
+The app's own "Checking for Ollama..." popup on load now checks for all three (`Koda`, `Soi`, `moondream`) and tells you exactly which are missing and how to fix each — use it to verify a new setup instead of guessing.
+
 ## Run
 ```
 set GITHUB_TOKEN=ghp_xxx          # optional, raises GitHub rate limit

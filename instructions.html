@@ -76,7 +76,7 @@
 <h2>1. Install Ollama</h2>
 <p>Ollama runs the AI models on your machine. If the app told you it can't find Ollama, install it here:</p>
 <p><a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a></p>
-<p>After installing, the two models this app uses (<strong>Koda</strong> and <strong>Soi</strong>) need to exist in your local Ollama — ask whoever set this up for you for the model files, or see the project's README if you're setting this up yourself.</p>
+<p>After installing, three models need to exist in your local Ollama — <strong>Koda</strong>, <strong>Soi</strong>, and <strong>moondream</strong> (vision, used for screenshot/video attach). The chat page checks for all three automatically on load and tells you exactly which are missing and how to fix each — no need to guess. Ask whoever set this up for you for the Koda/Soi model files, or see the project's README if you're setting this up yourself.</p>
 
 <h2>2. Using this site instead of localhost</h2>
 <p>Ollama only trusts requests from <code>localhost</code> by default. Since this site runs on the internet (not your own machine), Ollama blocks it unless you explicitly allow it. If you see "Can't reach Ollama":</p>
@@ -85,10 +85,11 @@
   <li>Paste this and press Enter (replace the URL if this site's address is different):
     <pre>setx OLLAMA_ORIGINS "https://anything-ai-hq.github.io"</pre>
   </li>
-  <li>Fully quit Ollama — right-click its icon near the clock (bottom-right of your screen) &rarr; <strong>Quit</strong></li>
+  <li>Fully quit Ollama — right-click its icon near the clock (bottom-right of your screen) &rarr; <strong>Quit</strong>. Just closing the chat window or the tray icon's popup does <strong>not</strong> count — Ollama keeps running in the background either way, still with the old settings, until "Quit" is clicked.</li>
   <li>Reopen Ollama and wait ~10 seconds</li>
   <li>Reload the chat page</li>
 </ol>
+<div class="note">Still stuck after "Quit" + reopen? Check Task Manager for a leftover <code>ollama.exe</code> process and end it manually — on some setups Ollama restarts itself before fully applying the new environment variable.</div>
 <div class="note">If you use both this site and a locally-hosted copy (e.g. <code>localhost:8000</code>), separate multiple allowed addresses with commas: <code>setx OLLAMA_ORIGINS "https://anything-ai-hq.github.io,http://localhost:8000"</code></div>
 
 <h2>3. Signing in</h2>
@@ -127,6 +128,8 @@
 <h2>Troubleshooting</h2>
 <ul>
   <li><strong>"Can't reach Ollama"</strong> — see step 2 above.</li>
+  <li><strong>"Missing model: ..." popup</strong> — Ollama is reachable but one of Koda/Soi/moondream isn't installed. The popup lists the exact fix command per model; run it, then click Retry.</li>
+  <li><strong>Attaching a screenshot/video gives an error or nothing happens</strong> — moondream isn't installed. Run <code>ollama pull moondream</code>, then try again.</li>
   <li><strong>No magic link email arrives</strong> — check spam. If it still doesn't show up after a few minutes, wait a bit and request a new one.</li>
   <li><strong>Model gives a weird or wrong answer</strong> — these are small, locally-run models. They're not as capable as large cloud AI systems, especially on obscure APIs or complex reasoning.</li>
 </ul>

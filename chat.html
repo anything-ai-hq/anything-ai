@@ -1327,6 +1327,7 @@ async function send() {
         stream: true,
       }),
     });
+    if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || `HTTP ${res.status} (model "${model.ollama}" not found — run: ollama list)`);
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
@@ -1405,6 +1406,7 @@ async function sendVisionMessage(chat, caption) {
         stream: true,
       }),
     });
+    if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || `HTTP ${res.status}`);
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
@@ -1531,6 +1533,16 @@ document.getElementById("useLegacyUI").addEventListener("change", (e) => {
 // default) — a browser can't tell those apart, so the message covers both.
 const OLLAMA_URL = "http://localhost:11434/api/tags";
 
+// Fixed per model rather than a shared "run: ollama pull X" line because
+// each one needs a different fix: moondream is a plain public pull, Soi
+// needs a Modelfile applied on top of a public pull, Koda is a custom
+// fine-tune that can't be pulled from any registry at all.
+const MODEL_FIX = {
+  koda: "Custom fine-tuned model, not in any registry — can't be pulled. Copy <code>models_gguf/*.gguf</code> + <code>Modelfile</code> from wherever you trained it, then: <code>ollama create Koda -f models_gguf\\Modelfile</code> (see README &rarr; \"New PC setup\").",
+  soi: "<code>ollama pull qwen2.5-coder:1.5b-instruct</code> then <code>ollama create Soi -f Modelfile</code> (Modelfile text in README).",
+  moondream: "<code>ollama pull moondream</code>",
+};
+
 async function checkOllama() {
   const overlay = document.getElementById("ollamaOverlay");
   const title = document.getElementById("ollamaTitle");
@@ -1544,9 +1556,25 @@ async function checkOllama() {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
-    await fetch(OLLAMA_URL, { signal: controller.signal });
+    const res = await fetch(OLLAMA_URL, { signal: controller.signal });
     clearTimeout(timeout);
-    overlay.classList.remove("open");
+    const data = await res.json();
+    const installed = new Set((data.models || []).map((m) => m.name.split(":")[0].toLowerCase()));
+    const missing = Object.keys(MODEL_FIX).filter((m) => !installed.has(m));
+    if (missing.length) {
+      title.textContent = missing.length === 3 ? "No models set up yet" : "Missing model" + (missing.length > 1 ? "s" : "") + ": " + missing.join(", ");
+      message.innerHTML = `<ul style="text-align:left; margin:0; padding-left:20px; line-height:1.7;">${missing.map((m) => `<li><strong>${m}</strong> — ${MODEL_FIX[m]}</li>`).join("")}</ul>`;
+      const retry = document.createElement("button");
+      retry.textContent = "Retry";
+      retry.addEventListener("click", checkOllama);
+      const skip = document.createElement("button");
+      skip.textContent = "Continue anyway";
+      skip.addEventListener("click", () => overlay.classList.remove("open"));
+      actions.appendChild(retry);
+      actions.appendChild(skip);
+    } else {
+      overlay.classList.remove("open");
+    }
   } catch {
     title.textContent = "Can't reach Ollama";
     message.innerHTML = `
@@ -1555,7 +1583,7 @@ async function checkOllama() {
       <ol style="text-align:left; margin:0; padding-left:20px; line-height:1.6;">
         <li>Open <strong>PowerShell</strong> (press Win key, type PowerShell, Enter)</li>
         <li>Paste this, press Enter:<br><code>setx OLLAMA_ORIGINS "${location.origin}"</code></li>
-        <li>Fully quit Ollama — right-click its icon near the clock (bottom-right) → <strong>Quit</strong></li>
+        <li>Fully quit Ollama — right-click its icon near the clock (bottom-right) → <strong>Quit</strong> (closing the window/tray popup alone does NOT quit it)</li>
         <li>Reopen Ollama, wait ~10 seconds</li>
         <li>Click Retry below</li>
       </ol>`;
