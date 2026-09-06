@@ -7,6 +7,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   * { box-sizing: border-box; }
+  /* iOS Safari auto-zooms into any input/select/textarea with font-size under
+     16px on focus - this keeps every form control at or above that threshold. */
+  input, select, textarea { font-size: 16px; }
   body { font-family: system-ui, sans-serif; margin: 0; background: #1e1e1e; color: #ddd; display: flex; height: 100vh; }
 
   #sidebar { width: 220px; background: #171717; border-right: 1px solid #333; display: flex; flex-direction: column; padding: 10px; gap: 6px; overflow-y: auto; }
@@ -20,6 +23,8 @@
   #newChatBtn:hover, #settingsBtn:hover, #agentsBtn:hover, #instructionsBtn:hover { background: #333; }
   #instructionsBtn { margin-top: auto; }
   #agentSelect { width: 100%; padding: 8px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; margin-bottom: 4px; }
+  #sidebarModelControls { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+  #sidebarModelControls .pill { width: 100%; border-radius: 6px; text-align: left; }
 
   #brand { font-weight: 700; font-size: 16px; padding: 4px; color: #fff; }
   #greeting { padding: 8px 4px 4px; font-size: 14px; color: #ddd; }
@@ -58,7 +63,7 @@
   @keyframes thinking-bounce { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
   #inputRow { display: flex; gap: 8px; align-items: center; }
   #prompt { flex: 1; padding: 10px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 6px; }
-  .pill { padding: 8px 10px; background: #2a2a2a; color: #bbb; border: 1px solid #444; border-radius: 999px; font-size: 13px; cursor: pointer; }
+  .pill { padding: 8px 10px; background: #2a2a2a; color: #bbb; border: 1px solid #444; border-radius: 999px; font-size: 16px; cursor: pointer; }
   .pill:hover { background: #333; color: #ddd; }
   button { padding: 10px 18px; border: none; border-radius: 6px; background: #2d5a9e; color: white; cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: default; }
@@ -119,6 +124,7 @@
 <div id="sidebar">
   <div id="brand">Anything.ai</div>
   <div id="greeting"></div>
+  <div id="sidebarModelControls"></div>
   <select id="agentSelect"></select>
   <button id="newChatBtn">+ New chat</button>
   <h3>Chats</h3>
@@ -395,6 +401,27 @@ function setGenerating(isGenerating) {
   document.getElementById("stopBtn").style.display = isGenerating ? "" : "none";
   document.getElementById("prompt").disabled = isGenerating;
 }
+
+// Model/effort pills live next to Send on desktop (ChatGPT-style), but that
+// crowds a phone-width input row, so on narrow screens the same two <select>
+// elements get physically reparented into the sidebar instead. Moving a DOM
+// node keeps its event listeners intact, so no listener re-wiring needed.
+const mobileMedia = window.matchMedia("(max-width: 700px)");
+function placeModelEffortControls() {
+  const modelSel = document.getElementById("modelSelect");
+  const effortSel = document.getElementById("effortSelect");
+  if (mobileMedia.matches) {
+    const target = document.getElementById("sidebarModelControls");
+    target.appendChild(modelSel);
+    target.appendChild(effortSel);
+  } else {
+    const inputRow = document.getElementById("inputRow");
+    const sendBtn = document.getElementById("send");
+    inputRow.insertBefore(modelSel, sendBtn);
+    inputRow.insertBefore(effortSel, sendBtn);
+  }
+}
+mobileMedia.addEventListener("change", placeModelEffortControls);
 
 // Model/effort pills live next to Send, ChatGPT-style: they show and control
 // the *active chat's* choice (persisted per chat), falling back to the last
@@ -858,6 +885,7 @@ async function checkOllama() {
   }
 }
 checkOllama();
+placeModelEffortControls();
 
 document.getElementById("loginSubmit").addEventListener("click", submitLogin);
 document.getElementById("loginName").addEventListener("keydown", (e) => { if (e.key === "Enter") submitLogin(); });
