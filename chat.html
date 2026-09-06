@@ -388,7 +388,7 @@
   <div id="log"></div>
   <div id="attachmentPreview"></div>
   <div id="inputRow">
-    <button id="attachBtn" type="button" title="Attach a screenshot or video">📎</button>
+    <button id="attachBtn" type="button" title="Attach a screenshot or video (or just paste an image with Ctrl+V)">📎</button>
     <input id="fileInput" type="file" accept="image/*,video/*" style="display:none">
     <input id="prompt" placeholder="Ask for some Luau code...">
     <div class="dropdown" id="modelSelectWrap">
@@ -1156,12 +1156,32 @@ function stripDataUrlPrefix(dataUrl) {
   return dataUrl.split(",")[1];
 }
 
-function readFileAsDataUrl(file) {
+// Screenshots/video frames are downscaled before sending to moondream - full
+// screen resolution (often 2-4K) makes no visible difference to a small
+// vision model's understanding but noticeably slows both the base64 upload
+// and moondream's own inference; 1024px on the long edge is plenty for
+// reading UI/code/text in a screenshot.
+const MAX_IMAGE_DIM = 1024;
+function fitDims(w, h, maxDim) {
+  if (w <= maxDim && h <= maxDim) return { w, h };
+  const scale = maxDim / Math.max(w, h);
+  return { w: Math.round(w * scale), h: Math.round(h * scale) };
+}
+
+function downscaleImage(file, maxDim = MAX_IMAGE_DIM) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const { w, h } = fitDims(img.naturalWidth, img.naturalHeight, maxDim);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(img.src);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => reject(new Error("Could not read image file"));
+    img.src = URL.createObjectURL(file);
   });
 }
 
@@ -1177,9 +1197,10 @@ function extractVideoFrames(file, count) {
     const canvas = document.createElement("canvas");
 
     function captureAndAdvance() {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      const { w, h } = fitDims(video.videoWidth, video.videoHeight, MAX_IMAGE_DIM);
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(video, 0, 0, w, h);
       frames.push(stripDataUrlPrefix(canvas.toDataURL("image/jpeg", 0.8)));
       idx++;
       if (idx >= timestamps.length) {
@@ -1207,11 +1228,13 @@ async function handleFileSelected(file) {
     if (file.type.startsWith("video/")) {
       const images = await extractVideoFrames(file, MAX_VIDEO_FRAMES);
       pendingAttachment = { images, label: `${file.name} (${images.length} frames)` };
-    } else {
-      const dataUrl = await readFileAsDataUrl(file);
+    } else if (file.type.startsWith("image/")) {
+      const dataUrl = await downscaleImage(file);
       pendingAttachment = { images: [stripDataUrlPrefix(dataUrl)], label: file.name };
       renderAttachmentPreview(dataUrl);
       return;
+    } else {
+      throw new Error("Unsupported file type");
     }
     renderAttachmentPreview(null);
   } catch (e) {
@@ -1249,6 +1272,16 @@ function clearAttachment() {
 document.getElementById("attachBtn").addEventListener("click", () => document.getElementById("fileInput").click());
 document.getElementById("fileInput").addEventListener("change", (e) => {
   if (e.target.files[0]) handleFileSelected(e.target.files[0]);
+});
+
+// Paste a screenshot (Win+Shift+S / Cmd+Shift+4, or copy any image) straight
+// into the prompt box - same attach pipeline as the 📎 picker, just skipping
+// the save-to-disk-then-browse round trip.
+document.getElementById("prompt").addEventListener("paste", (e) => {
+  const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+  if (!item) return;
+  e.preventDefault();
+  handleFileSelected(item.getAsFile());
 });
 
 async function send() {
