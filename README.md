@@ -9,23 +9,25 @@ python -m venv .venv
 ```
 
 ## New PC setup
-`git clone` alone is **not enough to run Koda** — `models_gguf/*.gguf` (941MB) and `data/luau_corpus.jsonl` are gitignored and don't transport with the repo. Two options:
+`git clone` alone is **not enough to run Koda/Soi** — their gguf weights are gitignored and don't transport with the repo. Both are published as a single GitHub Release, fully self-contained (Soi's release copy is the already-merged weights, not a Modelfile layered on a separate base pull — nothing else to fetch):
 
-1. **Download the trained weights** — no other PC needed, no retraining:
-   ```
-   curl -L -o models_gguf/qwen2.5-coder-1.5b-instruct.Q4_K_M.gguf https://github.com/anything-ai-hq/anything-ai/releases/download/koda-v1/qwen2.5-coder-1.5b-instruct.Q4_K_M.gguf
-   ollama create Koda -f models_gguf\Modelfile
-   ```
-   (`models_gguf/Modelfile` is already tracked in git, no need to download it separately. Full release: https://github.com/anything-ai-hq/anything-ai/releases/tag/koda-v1)
-2. **Retrain from scratch** — no GPU work saved, just the scrape+train+export pipeline below (30-60 min depending on GPU). Only needed if you're changing the training data/method, not for a plain new-PC setup.
+```
+curl -L -o Koda.gguf https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1/Koda.gguf
+curl -L -o Koda.Modelfile https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1/Koda.Modelfile
+ollama create Koda -f Koda.Modelfile
 
-Either way, also run:
+curl -L -o Soi.gguf https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1/Soi.gguf
+curl -L -o Soi.Modelfile https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1/Soi.Modelfile
+ollama create Soi -f Soi.Modelfile
+
+ollama pull moondream    # vision model, public, silently required for screenshot/video attach
 ```
-ollama pull qwen2.5-coder:1.5b-instruct
-ollama create Soi -f Modelfile          # Modelfile snippet is further down this README
-ollama pull moondream                   # vision model, silently required for screenshot/video attach
-```
-The app's own "Checking for Ollama..." popup on load now checks for all three (`Koda`, `Soi`, `moondream`) and tells you exactly which are missing and how to fix each — use it to verify a new setup instead of guessing.
+
+Run from any folder — each Modelfile references its gguf by relative filename, so just keep the pairs together while running `ollama create`. Full release page: https://github.com/anything-ai-hq/anything-ai/releases/tag/models-v1
+
+Retraining from scratch instead (only needed if you're changing the training data/method, not for a plain new-PC setup) is still possible via the scrape+train+export pipeline below (30-60 min depending on GPU). After retraining, push a new release: `gh release create models-v2 Koda.gguf Koda.Modelfile Soi.gguf Soi.Modelfile --repo anything-ai-hq/anything-ai --title "..."` and update the `models-v1` URLs here and in `chat.html`'s `MODEL_FIX.koda`.
+
+The app's own "Checking for Ollama..." popup on load checks for all three (`Koda`, `Soi`, `moondream`) and tells you exactly which are missing and how to fix each — use it to verify a new setup instead of guessing.
 
 ## Run
 ```

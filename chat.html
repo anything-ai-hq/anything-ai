@@ -1596,12 +1596,13 @@ document.getElementById("useLegacyUI").addEventListener("change", (e) => {
 const OLLAMA_URL = "http://localhost:11434/api/tags";
 
 // Fixed per model rather than a shared "run: ollama pull X" line because
-// each one needs a different fix: moondream is a plain public pull, Soi
-// needs a Modelfile applied on top of a public pull, Koda is a custom
-// fine-tune that can't be pulled from any registry at all.
+// each one needs a different fix: moondream is a plain public pull; Koda
+// and Soi are custom (not in any registry) but both fully self-contained
+// in the models-v1 GitHub Release - no separate base-model pull needed.
+const MODEL_RELEASE = "https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1";
 const MODEL_FIX = {
-  koda: "Custom fine-tuned model, not in any Ollama registry. Download the weights from <a href=\"https://github.com/anything-ai-hq/anything-ai/releases/tag/koda-v1\" target=\"_blank\" rel=\"noopener\">the koda-v1 release</a> into <code>models_gguf/</code>, then: <code>ollama create Koda -f models_gguf\\Modelfile</code> (see README &rarr; \"New PC setup\").",
-  soi: "<code>ollama pull qwen2.5-coder:1.5b-instruct</code> then <code>ollama create Soi -f Modelfile</code> (Modelfile text in README).",
+  koda: `Not in any registry. Download from <a href="https://github.com/anything-ai-hq/anything-ai/releases/tag/models-v1" target="_blank" rel="noopener">the models-v1 release</a>: <code>curl -L -o Koda.gguf ${MODEL_RELEASE}/Koda.gguf && curl -L -o Koda.Modelfile ${MODEL_RELEASE}/Koda.Modelfile && ollama create Koda -f Koda.Modelfile</code>`,
+  soi: `Not in any registry. Download from <a href="https://github.com/anything-ai-hq/anything-ai/releases/tag/models-v1" target="_blank" rel="noopener">the models-v1 release</a>: <code>curl -L -o Soi.gguf ${MODEL_RELEASE}/Soi.gguf && curl -L -o Soi.Modelfile ${MODEL_RELEASE}/Soi.Modelfile && ollama create Soi -f Soi.Modelfile</code>`,
   moondream: "<code>ollama pull moondream</code>",
 };
 
