@@ -79,7 +79,14 @@ def main():
             report_to="none",
         ),
     )
-    trainer.train()
+    checkpoints = sorted(
+        (p for p in Path("outputs").glob("checkpoint-*") if (p / "trainer_state.json").exists()),
+        key=lambda p: int(p.name.split("-")[1]),
+    ) if Path("outputs").exists() else []
+    resume_from = str(checkpoints[-1]) if checkpoints else None
+    if resume_from:
+        print(f"Resuming from {resume_from}")
+    trainer.train(resume_from_checkpoint=resume_from)
 
     out_path = Path(args.out)
     out_path.mkdir(parents=True, exist_ok=True)
