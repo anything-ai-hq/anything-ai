@@ -70,20 +70,55 @@ def clone_shallow(repo: dict, dest: Path) -> bool:
         return False
 
 
+SIGNATURE_RE = re.compile(r"^\s*(?:local\s+)?function\s+[\w:.]+\s*\([^)]*\)")
+BLOCK_OPEN_RE = re.compile(r"\bfunction\b")
+IF_FOR_WHILE_RE = re.compile(r"\b(?:if|for|while)\b.*\b(?:then|do)\b")
+STANDALONE_DO_RE = re.compile(r"^\s*do\b")
+END_RE = re.compile(r"\bend\b")
+MAX_SCAN_LINES = 200  # bound the forward scan so malformed files can't hang
+
+
+def line_block_delta(line: str) -> int:
+    """+1 per block opener needing an 'end', -1 per 'end' — linear-time, no backtracking risk."""
+    delta = 0
+    if BLOCK_OPEN_RE.search(line):
+        delta += 1
+    elif IF_FOR_WHILE_RE.search(line) or STANDALONE_DO_RE.search(line):
+        delta += 1
+    delta -= len(END_RE.findall(line))
+    return delta
+
+
 def extract_pairs(code: str) -> list[tuple[str, str]]:
-    """Split a Luau file into (prompt, completion) pairs at function boundaries."""
+    """Split a Luau file into (prompt, completion) pairs at function boundaries.
+
+    Scans forward line-by-line counting block-open/end balance instead of using
+    a backtracking regex across the whole file — large/malformed Luau files can
+    make a DOTALL `.*?` regex take catastrophically long otherwise.
+    """
     pairs = []
-    # function foo(...) ... end  OR  local function foo(...) ... end
-    pattern = re.compile(
-        r"((?:--.*\n)*)"          # optional leading comment lines
-        r"((?:local\s+)?function\s+[\w:.]+\s*\([^)]*\)"  # signature
-        r".*?\nend)",              # body up to matching 'end' (non-greedy, single func)
-        re.DOTALL,
-    )
-    for match in pattern.finditer(code):
-        comment, body = match.group(1).strip(), match.group(2).strip()
+    lines = code.split("\n")
+    for i, line in enumerate(lines):
+        if not SIGNATURE_RE.match(line):
+            continue
+        depth = 0
+        end_idx = None
+        for j in range(i, min(i + MAX_SCAN_LINES, len(lines))):
+            depth += line_block_delta(lines[j])
+            if depth == 0:
+                end_idx = j
+                break
+        if end_idx is None:
+            continue
+        body = "\n".join(lines[i:end_idx + 1]).strip()
         if len(body) < 20 or len(body) > 4000:
             continue
+        comment_lines = []
+        k = i - 1
+        while k >= 0 and lines[k].strip().startswith("--"):
+            comment_lines.insert(0, lines[k])
+            k -= 1
+        comment = "\n".join(comment_lines).strip()
         sig_line = body.split("\n", 1)[0]
         if comment:
             prompt = f"Write a Luau function based on this description:\n{comment}"
