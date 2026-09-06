@@ -96,6 +96,8 @@
   /* Everything else is a secondary utility, grouped into one icon row instead
      of three identical stacked bars competing for attention. */
   #utilityRow { margin-top: auto; display: flex; gap: 6px; }
+  #changelogLink { display: block; text-align: center; margin-top: 8px; font-size: 11px; color: var(--chrome-dim); text-decoration: none; }
+  #changelogLink:hover { color: var(--chrome-mid); text-decoration: underline; }
   .utility-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
     padding: 10px 4px 9px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised);
@@ -324,6 +326,7 @@
     <button id="settingsBtn" class="utility-btn"><img class="icon" src="assets/settings-icon.png" alt="">Settings</button>
     <a id="instructionsBtn" class="utility-btn" href="instructions.html" target="_blank" rel="noopener"><img class="icon" src="assets/help-icon.png" alt="">Help</a>
   </div>
+  <a id="changelogLink" href="changelog.html" target="_blank" rel="noopener">What's new</a>
 </div>
 <div id="sidebarBackdrop"></div>
 

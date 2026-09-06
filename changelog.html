@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's New — Anything.ai</title>
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-void: #0a0a0b;
+    --surface: #131315;
+    --chrome-hi: #eeeef1;
+    --chrome-mid: #9a9aa2;
+    --chrome-dim: #616168;
+    --border: #29292d;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: var(--font-body); margin: 0; padding: 2.5rem 1.25rem 5rem; background: var(--bg-void);
+    color: var(--chrome-hi); line-height: 1.6; min-height: 100vh; position: relative;
+  }
+  body::before {
+    content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(180,180,190,0.09), transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(230,230,236,0.06), transparent 40%);
+    animation: aurora-drift 22s ease-in-out infinite;
+    filter: blur(40px);
+  }
+  @keyframes aurora-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(4%, -3%) scale(1.08); }
+    66% { transform: translate(-3%, 4%) scale(0.96); }
+  }
+  @media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+
+  .page {
+    max-width: 720px; margin: 0 auto; background: linear-gradient(160deg, rgba(40,40,45,0.5), rgba(20,20,23,0.65));
+    backdrop-filter: blur(28px) saturate(150%); -webkit-backdrop-filter: blur(28px) saturate(150%);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; padding: 2.5rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08); position: relative; overflow: hidden;
+  }
+  .page::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--chrome-mid), transparent);
+  }
+
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: 1.7rem; margin-bottom: 0.25rem; letter-spacing: -0.01em; }
+  .back { display: inline-block; margin-bottom: 1.5rem; color: var(--chrome-dim); text-decoration: none; }
+  .back:hover { color: var(--chrome-mid); }
+  p, li { color: var(--chrome-mid); }
+  strong { color: var(--chrome-hi); }
+  code { background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-family: var(--font-mono); color: #d8d8dc; }
+
+  .entry { margin-top: 2.2rem; padding-top: 1.8rem; border-top: 1px solid var(--border); }
+  .entry:first-of-type { margin-top: 1.8rem; }
+  .entry-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .entry-version { font-family: var(--font-display); font-weight: 600; font-size: 1.2rem; color: var(--chrome-hi); }
+  .entry-date { font-size: 0.85rem; color: var(--chrome-dim); }
+  .entry h3 { font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; margin: 1.1rem 0 0.4rem; color: var(--chrome-hi); }
+  .entry ul { padding-left: 20px; margin: 0.3rem 0; }
+</style>
+</head>
+<body>
+
+<div class="page">
+<a class="back" href="chat.html">&larr; Back to chat</a>
+<h1><img src="assets/logo-icon.png" alt="" style="width:28px;height:28px;vertical-align:-5px;margin-right:6px;">What's New</h1>
+<p>Everything that's shipped, newest first.</p>
+
+<div class="entry">
+  <div class="entry-header">
+    <span class="entry-version">Update 1 — Initial release</span>
+    <span class="entry-date">September 2026</span>
+  </div>
+  <p>Anything.ai launches: a local-first AI chat with two purpose-built models, real accounts, and a full liquid-glass redesign.</p>
+
+  <h3>Two models</h3>
+  <ul>
+    <li><strong>Koda</strong> — a Luau/Roblox coding specialist, fine-tuned on real open-source Roblox codebases.</li>
+    <li><strong>Soi</strong> — a general everyday assistant for anything else.</li>
+    <li>Switch between them per chat with the pill next to Send, mid-conversation if you want.</li>
+  </ul>
+
+  <h3>Real accounts, not just a browser tab</h3>
+  <ul>
+    <li>Email magic-link sign-in — no password.</li>
+    <li>Chats, settings, memory, and custom agents sync across every device you sign into.</li>
+  </ul>
+
+  <h3>A chat that actually helps</h3>
+  <ul>
+    <li>Multiple chats with a searchable sidebar history.</li>
+    <li><strong>Agent Mode</strong> — save custom personas (a name + a description of how they should behave) and pin them to a chat.</li>
+    <li>Cross-chat memory — the model can remember durable facts about you or your project between separate conversations.</li>
+    <li>Slash commands: <code>/explain</code>, <code>/fix</code>, <code>/remember</code>, <code>/forget</code>, <code>/memory</code>, <code>/help</code>.</li>
+    <li>Effort control (Low/Medium/High) — trade speed for thoroughness per message.</li>
+    <li>Stop generation mid-response, with whatever streamed in kept.</li>
+    <li>Code blocks render with syntax-friendly formatting and a one-click Copy button.</li>
+    <li>Mobile-friendly: collapsible sidebar drawer, no accidental zoom on typing.</li>
+  </ul>
+
+  <h3>Local-first, on purpose</h3>
+  <ul>
+    <li>Both models run on your own PC via Ollama — not a cloud server you don't control.</li>
+    <li>Built-in detection if Ollama isn't reachable, with exact setup steps.</li>
+  </ul>
+
+  <h3>A real visual identity</h3>
+  <ul>
+    <li>Full redesign around custom liquid-chrome/mercury artwork — logo, favicons, and distinct avatars for Koda and Soi that appear right in the chat log next to their replies.</li>
+    <li>Frosted glass panels, ambient background motion, and a legacy-interface toggle in Settings if you ever want the older look back.</li>
+  </ul>
+</div>
+
+</div>
+
+</body>
+</html>
