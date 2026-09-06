@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Anything.ai</title>
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   * { box-sizing: border-box; }
@@ -26,7 +30,8 @@
   #sidebarModelControls { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
   #sidebarModelControls .pill { width: 100%; border-radius: 6px; text-align: left; }
 
-  #brand { font-weight: 700; font-size: 16px; padding: 4px; color: #fff; }
+  #brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; padding: 4px; color: #fff; }
+  #brand img { width: 24px; height: 24px; }
   #greeting { padding: 8px 4px 4px; font-size: 14px; color: #ddd; }
   #greeting .logout { display: block; margin-top: 2px; font-size: 12px; color: #888; cursor: pointer; }
   #greeting .logout:hover { color: #ccc; text-decoration: underline; }
@@ -122,7 +127,7 @@
 <body>
 
 <div id="sidebar">
-  <div id="brand">Anything.ai</div>
+  <div id="brand"><img src="assets/logo-icon.png" alt=""> Anything.ai</div>
   <div id="greeting"></div>
   <div id="sidebarModelControls"></div>
   <select id="agentSelect"></select>
