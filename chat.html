@@ -1400,7 +1400,7 @@ async function send() {
     if (e.name === "AbortError") {
       aborted = true;
     } else {
-      renderMessageContent(assistantDiv, "Error: " + e.message + (model.custom ? "" : "\n(Is `ollama serve` running?)"));
+      renderMessageContent(assistantDiv, (full ? full + "\n\n" : "") + "Error: " + e.message + (model.custom ? "" : "\n(Is `ollama serve` running?)"));
     }
   }
 
