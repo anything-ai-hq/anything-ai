@@ -2,6 +2,8 @@
 
 Three local models behind one web chat: **Koda** is a Luau/Roblox coder (LoRA fine-tuned from Qwen2.5-Coder-1.5B-Instruct), **Soi** is an everyday assistant (same base, general-purpose system prompt), both served via Ollama. **Vela** is local image generation (SD-Turbo via `diffusers`, served by `vela_server.py`) — a real model in the chat's model dropdown for subscribed/admin/granted accounts (everyone else gets a one-shot "meet Vela" popup demo). Pipeline: scrape -> LoRA fine-tune -> GGUF -> Ollama -> web chat / Studio plugin.
 
+Soi can also run entirely off a free cloud API key instead of local Ollama (Settings → "Run Soi in the cloud") — see [§ Soi cloud fallback](#soi-cloud-fallback-no-ollama-needed). Koda and Vela can't do this; they're custom weights no free-tier API hosts.
+
 ## Setup
 ```
 python -m venv .venv
@@ -88,6 +90,13 @@ Koda/Soi are text-only (Qwen2.5-Coder has no vision tower), so attaching a scree
 Serves on `http://localhost:7860`, first run downloads SD-Turbo (~5-6GB). Accounts with access (dev / subscribed / granted `vela` in the admin editor) get Vela as a real model in the chat dropdown — quota-checked server-side via the `use_image_generation` Postgres function (20/day, unlimited for dev). Everyone else gets a one-shot generation demo in the "Meet Vela" popup instead. Same CORS-from-any-origin approach as Ollama, so it works from the deployed site too, as long as `vela_server.py` is running on your machine. No Ollama involvement; Ollama doesn't serve image models.
 
 Generated images are **not persisted to Supabase** — only a text placeholder ("🎨 [Vela image — not saved, refresh loses it]") survives a reload, matching the vision-attachment decision (base64 image bytes would bloat every chat row). The image itself is visible for the current session only.
+
+## Soi cloud fallback (no Ollama needed)
+Settings → "Run Soi in the cloud" lets anyone use Soi with zero local setup — no Ollama, no GPU, nothing to install. Paste a free key from [openrouter.ai/keys](https://openrouter.ai/keys) and a model id (default: whatever's currently free on OpenRouter — check `https://openrouter.ai/api/v1/models` and filter for `id` ending in `:free`, since the free lineup rotates and a hardcoded default will eventually go stale). The key is sent straight from the browser to OpenRouter and stored only in the user's own Supabase settings row — same trust model as the existing BYOK custom-model feature, just not gated behind a subscription since the whole point is removing the local-hardware requirement for everyone.
+
+Koda and Vela can't do this — they're custom fine-tuned/trained weights that no free-tier API hosts. Only Soi (public base model + a system prompt, nothing custom) is eligible.
+
+One rough edge: the "Checking for Ollama..." popup on load still checks for local `Soi`/`Koda`/`moondream` regardless of a configured cloud key, so a cloud-only Soi user will still see it flag Soi/Koda/moondream as missing. Not a functional blocker ("Continue anyway" dismisses it and cloud Soi works fine) — just not aware of the cloud fallback yet.
 
 ## Studio plugin
 Copy `studio_plugin/AICoder.lua` into `%LOCALAPPDATA%\Roblox\Plugins\`.

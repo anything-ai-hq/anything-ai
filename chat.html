@@ -434,6 +434,17 @@
       </select>
     </div>
     <hr class="divider">
+    <h4>Run Soi in the cloud (optional)</h4>
+    <p class="hint">Skip installing Ollama for Soi - paste a free API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> and Soi runs there instead. Sent straight from your browser to OpenRouter, stored only in your own account. Koda and Vela still need your own hardware - they're custom models no free API hosts.</p>
+    <div class="setting-row">
+      <label>OpenRouter key</label>
+      <input id="setSoiCloudKey" type="password" placeholder="Leave blank to use local Ollama">
+    </div>
+    <div class="setting-row">
+      <label>Model id</label>
+      <input id="setSoiCloudModel" placeholder="google/gemma-4-31b-it:free">
+    </div>
+    <hr class="divider">
     <div id="subscriberSettings" style="display:none;">
       <div class="setting-row">
         <label>Theme</label>
@@ -571,7 +582,9 @@ const PERSONA = {
   },
 };
 
-const DEFAULT_SETTINGS = { displayName: "", enthusiasm: "low", emojis: "low", sarcasm: "low", customModels: [] };
+const DEFAULT_SETTINGS = { displayName: "", enthusiasm: "low", emojis: "low", sarcasm: "low", customModels: [], soiCloudKey: "", soiCloudModel: "" };
+const SOI_CLOUD_URL = "https://openrouter.ai/api/v1/chat/completions";
+const SOI_CLOUD_DEFAULT_MODEL = "google/gemma-4-31b-it:free";
 
 // Real accounts via Supabase (free tier): email magic-link auth, and every
 // chat/agent/memory-fact/setting lives in Postgres behind row-level security
@@ -614,6 +627,8 @@ async function saveSettings(s) {
     emojis: s.emojis,
     sarcasm: s.sarcasm,
     custom_models: s.customModels,
+    soi_cloud_key: s.soiCloudKey,
+    soi_cloud_model: s.soiCloudModel,
   });
 }
 
@@ -628,7 +643,7 @@ async function loadAllData() {
   agents = (agentsRes.data || []).map((r) => ({ id: r.id, name: r.name, prompt: r.prompt }));
   memory = (memoryRes.data || []).map((r) => ({ id: r.id, fact: r.fact }));
   settings = settingsRes.data
-    ? { displayName: settingsRes.data.display_name || "", enthusiasm: settingsRes.data.enthusiasm, emojis: settingsRes.data.emojis, sarcasm: settingsRes.data.sarcasm, customModels: settingsRes.data.custom_models || [] }
+    ? { displayName: settingsRes.data.display_name || "", enthusiasm: settingsRes.data.enthusiasm, emojis: settingsRes.data.emojis, sarcasm: settingsRes.data.sarcasm, customModels: settingsRes.data.custom_models || [], soiCloudKey: settingsRes.data.soi_cloud_key || "", soiCloudModel: settingsRes.data.soi_cloud_model || "" }
     : { ...DEFAULT_SETTINGS };
 }
 
@@ -919,7 +934,18 @@ function allModels() {
   }
   return { ...MODELS, ...vela, ...custom };
 }
+// Soi has no fine-tuned weights of its own (just the public base model + a
+// system prompt), so it's the one model that can run entirely off someone's
+// free-tier cloud key instead of their local Ollama - no hardware, no local
+// setup, for anyone willing to paste a free OpenRouter key into Settings.
+// Reuses the existing "custom model" (BYOK) request path below, so this is
+// just Soi impersonating a custom model when a cloud key is present -
+// Koda/Vela still require local hardware since they're custom weights that
+// no free-tier API hosts.
 function getModel(chat) {
+  if ((chat?.model || DEFAULT_MODEL_ID) === "soi" && settings.soiCloudKey) {
+    return { ...MODELS.soi, custom: true, baseUrl: SOI_CLOUD_URL, apiKey: settings.soiCloudKey, model: settings.soiCloudModel || SOI_CLOUD_DEFAULT_MODEL };
+  }
   return allModels()[chat?.model] || MODELS[DEFAULT_MODEL_ID];
 }
 
@@ -1563,6 +1589,8 @@ document.getElementById("settingsBtn").addEventListener("click", () => {
   document.getElementById("setEnthusiasm").value = settings.enthusiasm;
   document.getElementById("setEmojis").value = settings.emojis;
   document.getElementById("setSarcasm").value = settings.sarcasm;
+  document.getElementById("setSoiCloudKey").value = settings.soiCloudKey;
+  document.getElementById("setSoiCloudModel").value = settings.soiCloudModel;
   document.getElementById("useLegacyUI").checked = false;
   document.getElementById("subscriberSettings").style.display = hasSubscription() ? "block" : "none";
   if (hasSubscription()) {
@@ -1620,6 +1648,12 @@ document.getElementById("setDisplayName").addEventListener("change", (e) => {
 for (const [key, id] of [["enthusiasm", "setEnthusiasm"], ["emojis", "setEmojis"], ["sarcasm", "setSarcasm"]]) {
   document.getElementById(id).addEventListener("change", (e) => {
     settings[key] = e.target.value;
+    saveSettings(settings);
+  });
+}
+for (const [key, id] of [["soiCloudKey", "setSoiCloudKey"], ["soiCloudModel", "setSoiCloudModel"]]) {
+  document.getElementById(id).addEventListener("change", (e) => {
+    settings[key] = e.target.value.trim();
     saveSettings(settings);
   });
 }

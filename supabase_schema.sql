@@ -36,6 +36,16 @@ create table if not exists settings (
   sarcasm text not null default 'low'
 );
 
+-- Columns added after the table above was first created - chat.html already
+-- reads/writes all of these, but `create table if not exists` is a no-op on
+-- an existing table, so anyone who already ran this file needs these ALTERs
+-- too. Safe to re-run this whole file any time (every statement here is
+-- idempotent).
+alter table settings add column if not exists display_name text not null default '';
+alter table settings add column if not exists custom_models jsonb not null default '[]'::jsonb;
+alter table settings add column if not exists soi_cloud_key text;
+alter table settings add column if not exists soi_cloud_model text;
+
 alter table chats enable row level security;
 alter table agents enable row level security;
 alter table memory enable row level security;
