@@ -1,6 +1,11 @@
 # Anything.ai
 
-Three local models behind one web chat: **Koda** is a Luau/Roblox coder (LoRA fine-tuned from Qwen2.5-Coder-1.5B-Instruct), **Soi** is an everyday assistant (same base, general-purpose system prompt), both served via Ollama. **Vela** is local image generation (SD-Turbo via `diffusers`, served by `vela_server.py`) — a real model in the chat's model dropdown for subscribed/admin/granted accounts (everyone else gets a one-shot "meet Vela" popup demo). Pipeline: scrape -> LoRA fine-tune -> GGUF -> Ollama -> web chat / Studio plugin.
+Three local models behind one web chat: **Koda** is a Luau/Roblox coder (public Qwen2.5-Coder-7B-Instruct base + a system prompt — see "Why Koda isn't the fine-tune anymore" below), **Soi** is an everyday assistant (a smaller custom fine-tune, general-purpose system prompt), both served via Ollama. **Vela** is local image generation (SD-Turbo via `diffusers`, served by `vela_server.py`) — a real model in the chat's model dropdown for subscribed/admin/granted accounts (everyone else gets a one-shot "meet Vela" popup demo).
+
+### Why Koda isn't the fine-tune anymore
+The original Koda was a LoRA fine-tune of Qwen2.5-Coder-1.5B-Instruct (the `scrape_dataset.py` → `train_lora.py` → `export_gguf.py` pipeline below still builds it). Tested live: it consistently stopped after writing **one function** of a multi-function request and hit its own stop token every time, regardless of temperature/token limits — a training-data artifact (probably mostly single-function snippets), not a settings problem. Swapped in the 7B base model instead (no fine-tune, just bigger) and it wrote complete, correctly-closed multi-function modules on the same prompts. Koda's whole "identity" is the system prompt in `chat.html`'s `MODELS.koda.system` (always sent fresh, overriding whatever's baked into the Ollama model) — so this was a one-line swap of `MODELS.koda.ollama`, nothing else changed. The old 1.5B fine-tune pipeline is left in place below in case you want to revisit it (e.g. retrain on better multi-function examples), but it's not what's live.
+
+Soi can also run entirely off a free cloud API key instead of local Ollama (Settings → "Run Soi in the cloud") — see [§ Soi cloud fallback](#soi-cloud-fallback-no-ollama-needed). Vela can't do this (custom weights no free-tier API hosts). Koda technically could get the same treatment now that it's also just a system prompt over a public base model, but that isn't built - Koda still requires local Ollama today.
 
 Soi can also run entirely off a free cloud API key instead of local Ollama (Settings → "Run Soi in the cloud") — see [§ Soi cloud fallback](#soi-cloud-fallback-no-ollama-needed). Koda and Vela can't do this; they're custom weights no free-tier API hosts.
 
@@ -11,27 +16,29 @@ python -m venv .venv
 ```
 
 ## New PC setup
-`git clone` alone is **not enough to run Koda/Soi** — their gguf weights are gitignored and don't transport with the repo. Both are published as a single GitHub Release, fully self-contained (Soi's release copy is the already-merged weights, not a Modelfile layered on a separate base pull — nothing else to fetch):
+Koda and moondream are now plain public pulls - no custom files, no GitHub Release needed for either:
 
 ```
-curl -L -o Koda.gguf https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1/Koda.gguf
-curl -L -o Koda.Modelfile https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1/Koda.Modelfile
-ollama create Koda -f Koda.Modelfile
+ollama pull qwen2.5-coder:7b-instruct-q4_K_M
+ollama pull moondream
+```
 
+Soi is still a custom fine-tune, gitignored (`git clone` alone won't get it) and published as a self-contained GitHub Release (the release copy is the already-merged weights, not a Modelfile layered on a separate base pull — nothing else to fetch):
+
+```
 curl -L -o Soi.gguf https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1/Soi.gguf
 curl -L -o Soi.Modelfile https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1/Soi.Modelfile
 ollama create Soi -f Soi.Modelfile
-
-ollama pull moondream    # vision model, public, silently required for screenshot/video attach
 ```
 
-Run from any folder — each Modelfile references its gguf by relative filename, so just keep the pairs together while running `ollama create`. Full release page: https://github.com/anything-ai-hq/anything-ai/releases/tag/models-v1
+Run from any folder — the Modelfile references its gguf by relative filename, so keep the pair together while running `ollama create`. Full release page: https://github.com/anything-ai-hq/anything-ai/releases/tag/models-v1 (still has Koda.gguf/Koda.Modelfile too, from before the 7B swap — unused now, kept for anyone who wants the original 1.5B fine-tune instead).
 
-Retraining from scratch instead (only needed if you're changing the training data/method, not for a plain new-PC setup) is still possible via the scrape+train+export pipeline below (30-60 min depending on GPU). After retraining, push a new release: `gh release create models-v2 Koda.gguf Koda.Modelfile Soi.gguf Soi.Modelfile --repo anything-ai-hq/anything-ai --title "..."` and update the `models-v1` URLs here and in `chat.html`'s `MODEL_FIX.koda`.
+Retraining Soi (or reviving the old Koda fine-tune) from scratch is still possible via the scrape+train+export pipeline below (30-60 min depending on GPU). After retraining, push a new release: `gh release create models-v2 Soi.gguf Soi.Modelfile --repo anything-ai-hq/anything-ai --title "..."` and update the `models-v1` URLs here and in `chat.html`'s `MODEL_STEPS`.
 
-The app's own "Checking for Ollama..." popup on load checks for all three (`Koda`, `Soi`, `moondream`) and tells you exactly which are missing and how to fix each — use it to verify a new setup instead of guessing.
+The app's own "Checking for Ollama..." popup on load checks for all three (`qwen2.5-coder:7b-instruct-q4_K_M` exactly, `Soi`, `moondream`) and tells you exactly which are missing and how to fix each — use it to verify a new setup instead of guessing.
 
 ## Run
+Builds the original 1.5B LoRA fine-tune (not what's live - see "Why Koda isn't the fine-tune anymore" above). Useful if you want to retrain it with better data, otherwise skip this and just `ollama pull qwen2.5-coder:7b-instruct-q4_K_M`.
 ```
 set GITHUB_TOKEN=ghp_xxx          # optional, raises GitHub rate limit
 .venv\Scripts\python scrape_dataset.py

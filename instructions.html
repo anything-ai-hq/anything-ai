@@ -76,7 +76,7 @@
 <h2>1. Install Ollama</h2>
 <p>Ollama runs the AI models on your machine. If the app told you it can't find Ollama, install it here:</p>
 <p><a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a></p>
-<p>After installing, three models need to exist in your local Ollama — <strong>Koda</strong>, <strong>Soi</strong>, and <strong>moondream</strong> (vision, used for screenshot/video attach). The chat page checks for all three automatically on load and tells you exactly which are missing and how to fix each — no need to guess. Ask whoever set this up for you for the Koda/Soi model files, or see the project's README if you're setting this up yourself.</p>
+<p>After installing, three models need to exist in your local Ollama — <strong>Koda</strong>, <strong>Soi</strong>, and <strong>moondream</strong> (vision, used for screenshot/video attach). The chat page checks for all three automatically on load and tells you exactly which are missing and how to fix each — no need to guess. Koda is a public model (<code>ollama pull qwen2.5-coder:7b-instruct-q4_K_M</code>); ask whoever set this up for you for Soi's model files specifically, or see the project's README if you're setting this up yourself.</p>
 
 <h2>2. Using this site instead of localhost</h2>
 <p>Ollama only trusts requests from <code>localhost</code> by default. Since this site runs on the internet (not your own machine), Ollama blocks it unless you explicitly allow it. If you see "Can't reach Ollama":</p>
@@ -102,7 +102,7 @@
   <li><strong>Vela</strong> — image generation, only shown to subscribed/admin/granted accounts. Type a description and send, same as any other model — 20 images/day.</li>
 </ul>
 <p>Switch between them using the pill next to the Send button — it applies to the current chat and can be changed mid-conversation.</p>
-<p>Don't have Ollama installed? In <strong>Settings</strong>, paste a free API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> under "Run Soi in the cloud" — Soi then works with no local setup at all. Koda and Vela still need Ollama/your own hardware since they're custom models no free API hosts.</p>
+<p>Don't have Ollama installed? In <strong>Settings</strong>, paste a free API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> under "Run Soi in the cloud" — Soi then works with no local setup at all. Koda and Vela still need Ollama/your own hardware — Koda because it's a bigger model most free APIs don't offer for free, Vela because it's a custom model no free API hosts.</p>
 
 <h2>5. Effort</h2>
 <p>The other pill next to Send controls how much the model "tries": <strong>Low</strong> is fast and brief, <strong>High</strong> is slower and more thorough. There's no separate reasoning mode under the hood — this adjusts response length, randomness, and how carefully it's told to think.</p>

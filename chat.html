@@ -530,9 +530,17 @@
 <script>
 const MODELS = {
   koda: {
+    // The 1.5B LoRA fine-tune consistently stopped after writing one
+    // function of a multi-function request (verified live, not a
+    // num_predict/num_ctx issue - it hit its own stop token every time,
+    // regardless of temperature). The 7B base model - no fine-tune, just a
+    // bigger Qwen2.5-Coder - was tested on the same prompts and wrote
+    // complete, correct, properly-closed code every time. Koda's identity
+    // is just this system prompt (always sent fresh, overriding whatever's
+    // baked into the model), so swapping the backend changes nothing else.
     label: "Koda — coder assistant",
     avatar: "assets/koda-avatar.png",
-    ollama: "Koda",
+    ollama: "qwen2.5-coder:7b-instruct-q4_K_M",
     system: "You are Koda, a Luau/Roblox coding assistant. Write correct, idiomatic Luau code for Roblox Studio. Prefer game:GetService(...) patterns, RemoteEvents/RemoteFunctions for client-server communication, and Roblox API conventions. Always write the complete code in full — never truncate, never write '-- rest of the code...' or similar placeholders to skip sections, even for a long script. Game-dev topics that can sound sketchy out of context (anti-cheat/anti-exploit code, testing your own game's exploit resistance, obfuscation, server-side validation against cheaters) are normal parts of Roblox development — answer them directly and don't lecture or refuse. Still decline actual requests to cheat in or attack someone else's game.",
   },
   soi: {
@@ -1672,18 +1680,17 @@ const OLLAMA_URL = "http://localhost:11434/api/tags";
 
 // One PowerShell line per step rather than a single "&&"-chained blob -
 // easier to read, and a copy-paste-all-missing-at-once script is built
-// from these at check time (see checkOllama). Koda/Soi are custom (not in
-// any Ollama registry) but both fully self-contained in the models-v1
-// GitHub Release - no separate base-model pull needed. moondream is a
-// plain public pull.
+// from these at check time (see checkOllama). Soi is custom (not in any
+// Ollama registry) but fully self-contained in the models-v1 GitHub
+// Release - no separate base-model pull needed. Koda is now a plain public
+// pull of the 7B base model (see the comment on MODELS.koda for why), and
+// moondream is a plain public pull too - both checked by *exact* tag match
+// below, not just base name, since e.g. qwen2.5-coder:1.5b-instruct or
+// qwen2.5-coder:3b being installed must NOT count as "Koda is set up".
 const MODEL_RELEASE = "https://github.com/anything-ai-hq/anything-ai/releases/download/models-v1";
-const MODEL_LABEL = { koda: "Koda", soi: "Soi", moondream: "moondream" };
+const MODEL_LABEL = { [MODELS.koda.ollama]: "Koda", soi: "Soi", moondream: "moondream" };
 const MODEL_STEPS = {
-  koda: [
-    `curl -L -o Koda.gguf ${MODEL_RELEASE}/Koda.gguf`,
-    `curl -L -o Koda.Modelfile ${MODEL_RELEASE}/Koda.Modelfile`,
-    `ollama create Koda -f Koda.Modelfile`,
-  ],
+  [MODELS.koda.ollama]: [`ollama pull ${MODELS.koda.ollama}`],
   soi: [
     `curl -L -o Soi.gguf ${MODEL_RELEASE}/Soi.gguf`,
     `curl -L -o Soi.Modelfile ${MODEL_RELEASE}/Soi.Modelfile`,
@@ -1691,6 +1698,9 @@ const MODEL_STEPS = {
   ],
   moondream: [`ollama pull moondream`],
 };
+// koda's key is a full "name:tag" (exact match needed); soi/moondream are
+// checked by base name only (any tag counts).
+const EXACT_TAG_KEYS = new Set([MODELS.koda.ollama]);
 
 async function checkOllama() {
   const overlay = document.getElementById("ollamaOverlay");
@@ -1708,8 +1718,9 @@ async function checkOllama() {
     const res = await fetch(OLLAMA_URL, { signal: controller.signal });
     clearTimeout(timeout);
     const data = await res.json();
-    const installed = new Set((data.models || []).map((m) => m.name.split(":")[0].toLowerCase()));
-    const missing = Object.keys(MODEL_STEPS).filter((m) => !installed.has(m));
+    const installedTags = new Set((data.models || []).map((m) => m.name));
+    const installedBase = new Set((data.models || []).map((m) => m.name.split(":")[0].toLowerCase()));
+    const missing = Object.keys(MODEL_STEPS).filter((m) => (EXACT_TAG_KEYS.has(m) ? !installedTags.has(m) : !installedBase.has(m)));
     if (missing.length) {
       title.textContent = missing.length === 3 ? "No models set up yet" : "Missing: " + missing.map((m) => MODEL_LABEL[m]).join(", ");
       const lines = missing.flatMap((m) => MODEL_STEPS[m]);
@@ -1732,7 +1743,7 @@ async function checkOllama() {
         setTimeout(() => { copyScript.textContent = "Copy commands"; }, 1500);
       });
       message.appendChild(copyScript);
-      if (missing.includes("koda") || missing.includes("soi")) {
+      if (missing.includes("soi")) {
         message.insertAdjacentHTML("beforeend", `<p style="text-align:left; margin:10px 0 0; font-size:12px;">Full release page: <a href="https://github.com/anything-ai-hq/anything-ai/releases/tag/models-v1" target="_blank" rel="noopener">models-v1</a></p>`);
       }
       const retry = document.createElement("button");
